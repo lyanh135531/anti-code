@@ -44,7 +44,7 @@ logger = logging.getLogger("pipeline")
 
 # ── Import config ───────────────────────────────────────────
 from config import (
-    RELIGION_TOPICS, OUTPUT_DIR, MUSIC_DIR,
+    TARGET_RELIGION, OUTPUT_DIR, MUSIC_DIR,
     TTS_VOICE, TTS_RATE, TTS_PITCH,
     IMAGE_DURATION, FADE_DURATION, MAX_IMAGES,
     FPS, VIDEO_WIDTH, VIDEO_HEIGHT,
@@ -62,30 +62,7 @@ from modules.seo_optimizer import generate_seo_metadata, format_description_for_
 from modules.uploader      import upload_video, upload_shorts, get_channel_info
 
 
-# ============================================================
-# CHỌN TOPIC TỰ ĐỘNG
-# ============================================================
 
-def _get_topic_index() -> int:
-    """
-    Xoay vòng topic theo ngày.
-    Mỗi ngày tự động chọn topic tiếp theo trong danh sách.
-    """
-    counter_file = Path(__file__).parent / ".topic_counter"
-    idx = 0
-    if counter_file.exists():
-        try:
-            idx = int(counter_file.read_text().strip())
-        except Exception:
-            idx = 0
-
-    # Chọn theo ngày trong năm nếu không có counter
-    if idx <= 0:
-        idx = datetime.now().timetuple().tm_yday % len(RELIGION_TOPICS)
-
-    next_idx = (idx + 1) % len(RELIGION_TOPICS)
-    counter_file.write_text(str(next_idx))
-    return idx
 
 
 def _get_background_music() -> str | None:
@@ -113,7 +90,6 @@ def _generate_video_id(topic_config: dict) -> str:
 # ============================================================
 
 def run_pipeline(
-    topic_index:  int  = None,
     upload:       bool = True,
     make_shorts:  bool = True,
     dry_run:      bool = False,     # True = chỉ tạo file, không upload
@@ -123,7 +99,6 @@ def run_pipeline(
     Chạy toàn bộ pipeline tạo video.
     
     Args:
-        topic_index:  Index topic trong RELIGION_TOPICS (None = tự động)
         upload:       Upload lên YouTube sau khi tạo
         make_shorts:  Tạo YouTube Shorts kèm theo
         dry_run:      Tạo file nhưng không upload
@@ -149,13 +124,12 @@ def run_pipeline(
     logger.info("=" * 60)
 
     # ── BƯỚC 0: Chọn Topic ────────────────────────────────
-    if topic_index is None:
-        topic_index = _get_topic_index()
+    from modules.idea_gen import generate_new_topic
 
-    topic_config = RELIGION_TOPICS[topic_index % len(RELIGION_TOPICS)]
+    topic_config = generate_new_topic(TARGET_RELIGION)
     video_id    = _generate_video_id(topic_config)
 
-    logger.info(f"📌 Topic #{topic_index}: {topic_config['topic']}")
+    logger.info(f"📌 Topic: {topic_config['topic']}")
     logger.info(f"📖 Religion: {topic_config['religion']}")
     logger.info(f"🆔 Video ID: {video_id}")
 
@@ -439,8 +413,6 @@ Examples:
         """
     )
     
-    parser.add_argument("--topic",        type=int, default=None,
-                        help="Index của topic (0 = đầu tiên)")
     parser.add_argument("--dry-run",      action="store_true",
                         help="Tạo file nhưng không upload YouTube")
     parser.add_argument("--no-upload",    action="store_true",
@@ -456,11 +428,16 @@ Examples:
 
     args = parser.parse_args()
 
-    # ── Hiển thị danh sách topics ─────────────────────────
+    # ── Hiển thị danh sách topics đã tạo ──────────────────
     if args.list_topics:
-        print("\n📋 DANH SÁCH TOPICS:\n" + "-" * 70)
-        for i, t in enumerate(RELIGION_TOPICS):
-            print(f"  [{i:2d}] [{t['religion']:12s}] {t['topic'][:60]}")
+        from modules.idea_gen import _get_past_topics
+        past = _get_past_topics()
+        print("\n📋 DANH SÁCH LỊCH SỬ TOPICS GẦN ĐÂY:\n" + "-" * 70)
+        if not past:
+            print("  Chưa có video nào từng được tạo.")
+        else:
+            for i, t in enumerate(past):
+                print(f"  [{i:2d}] {t[:70]}")
         print("-" * 70)
         sys.exit(0)
 
@@ -483,7 +460,6 @@ Examples:
 
     # ── Chạy pipeline ─────────────────────────────────────
     results = run_pipeline(
-        topic_index   = args.topic,
         upload        = not (args.no_upload or args.dry_run),
         make_shorts   = not args.no_shorts,
         dry_run       = args.dry_run,

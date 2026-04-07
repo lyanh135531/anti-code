@@ -104,63 +104,6 @@ RELIGION_COLORS = {
 }
 
 # ============================================================
-# CHỦ ĐỀ VIDEO (Pipeline tự động xoay vòng)
+# CHỦ ĐỀ VIDEO (Autonomous AI generation)
 # ============================================================
-RELIGION_TOPICS = [
-    {
-        "topic": "The Most Powerful Prayers in Christianity",
-        "religion": "Christianity",
-        "keywords": ["prayer", "christianity", "faith", "god", "powerful prayers"],
-        "script_angle": "Explore the most profound Christian prayers and their spiritual significance",
-        "shorts_hook": "The prayer Jesus said only you should know"
-    },
-    {
-        "topic": "Sacred Bible Stories That Will Restore Your Faith",
-        "religion": "Christianity",
-        "keywords": ["bible", "christianity", "faith", "stories", "miracles"],
-        "script_angle": "Retell 3 Bible stories with deep spiritual meanings for today's world",
-        "shorts_hook": "The Bible story that scientists can't explain"
-    },
-    {
-        "topic": "The Hidden Symbolism of the Cross",
-        "religion": "Christianity",
-        "keywords": ["cross", "christianity", "symbolism", "jesus", "sacred"],
-        "script_angle": "Explain the deep historical and spiritual symbolism of the Christian cross",
-        "shorts_hook": "What does the cross REALLY mean in Christianity?"
-    },
-    {
-        "topic": "Biblical Miracles That Defy Explanation",
-        "religion": "Christianity",
-        "keywords": ["miracles", "bible", "christianity", "faith", "unexplained"],
-        "script_angle": "Describe 5 famous biblical miracles and examine their enduring spiritual impact",
-        "shorts_hook": "Scientists tried to debunk this miracle and failed"
-    },
-    {
-        "topic": "The Secret History of the Dead Sea Scrolls",
-        "religion": "Christianity",
-        "keywords": ["dead sea scrolls", "bible", "christianity", "history", "ancient"],
-        "script_angle": "Discuss the discovery of the Dead Sea Scrolls and how they changed our understanding of the Bible",
-        "shorts_hook": "What the Dead Sea Scrolls revealed about the Bible"
-    },
-    {
-        "topic": "Angels in the Bible: What Do They Really Look Like?",
-        "religion": "Christianity",
-        "keywords": ["angels", "bible", "christianity", "seraphim", "cherubim"],
-        "script_angle": "Explore the biblical descriptions of angels, clearing up modern misconceptions",
-        "shorts_hook": "Biblically accurate angels will terrify you"
-    },
-    {
-        "topic": "The Seven Deadly Sins and Their Heavenly Virtues",
-        "religion": "Christianity",
-        "keywords": ["seven deadly sins", "virtues", "christianity", "morality", "faith"],
-        "script_angle": "Break down the historical concept of the seven deadly sins and counter them with the seven heavenly virtues",
-        "shorts_hook": "The sin you commit every single day"
-    },
-    {
-        "topic": "Who Were the 12 Apostles? Real History Uncovered",
-        "religion": "Christianity",
-        "keywords": ["apostles", "disciples", "jesus", "christianity", "bible history"],
-        "script_angle": "Trace the actual historical lives and fates of Jesus' twelve core disciples",
-        "shorts_hook": "The brutal fate of Jesus' 12 apostles"
-    },
-]
+TARGET_RELIGION = "Christianity"
