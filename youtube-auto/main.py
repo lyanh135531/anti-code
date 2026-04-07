@@ -270,6 +270,7 @@ def run_pipeline(
             W             = VIDEO_WIDTH,
             H             = VIDEO_HEIGHT,
             fps           = FPS,
+            vtt_path      = audio_main_path.replace(".mp3", ".srt"),
         )
         results["video_path"] = video_path
         size_mb = Path(video_path).stat().st_size / 1024 / 1024
@@ -306,6 +307,7 @@ def run_pipeline(
                 output_path  = shorts_out,
                 channel_name = CHANNEL_NAME,
                 fps          = FPS,
+                vtt_path     = shorts_audio_path.replace(".mp3", ".srt"),
             )
             results["shorts_path"] = shorts_path
             logger.info(f"  ✅ Shorts: {shorts_out}")

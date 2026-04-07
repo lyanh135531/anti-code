@@ -36,9 +36,20 @@ def _clean_script_for_tts(script: str) -> str:
 
 
 async def _generate_audio_async(text: str, output_path: str, voice: str, rate: str, pitch: str):
-    """Async function để tạo audio bằng Edge TTS."""
+    """Async function để tạo audio & phụ đề (VTT) bằng Edge TTS."""
     communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-    await communicate.save(output_path)
+    vtt_path = str(output_path).rsplit(".", 1)[0] + ".srt"
+    
+    submaker = edge_tts.SubMaker()
+    with open(output_path, "wb") as audio_file:
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_file.write(chunk["data"])
+            elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
+                submaker.feed(chunk)
+                
+    with open(vtt_path, "w", encoding="utf-8") as sub_file:
+        sub_file.write(submaker.get_srt())
 
 
 def text_to_speech(

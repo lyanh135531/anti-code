@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _configure_gemini():
     """Cấu hình Gemini API."""
     genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-2.5-flash")
+    return genai.GenerativeModel("gemini-3-flash-preview")
 
 
 def generate_video_script(topic_config: dict) -> dict:
@@ -79,7 +79,10 @@ Now write the complete script:"""
                 )
             )
             script_text = response.text
-            logger.info(f"Script tạo thành công: {len(script_text.split())} từ")
+            word_count = len(script_text.split())
+            if word_count < 100:
+                raise ValueError(f"Script tạo ra quá ngắn ({word_count} từ).")
+            logger.info(f"Script tạo thành công: {word_count} từ")
             return {
                 "topic":    topic,
                 "religion": religion,
@@ -88,9 +91,14 @@ Now write the complete script:"""
                 "word_count": len(script_text.split()),
             }
         except Exception as e:
-            logger.warning(f"Attempt {attempt+1}/3 thất bại: {e}")
+            err_str = str(e)
+            logger.warning(f"Attempt {attempt+1}/3 thất bại: {err_str}")
             if attempt < 2:
-                time.sleep(5)
+                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
+                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
+                    time.sleep(45)
+                else:
+                    time.sleep(5)
 
     raise RuntimeError("Không thể tạo script sau 3 lần thử")
 
@@ -143,12 +151,19 @@ Write ONLY the script text, no instructions or meta-comments:"""
             )
             shorts_script = response.text.strip()
             word_count = len(shorts_script.split())
+            if word_count < 50:
+                raise ValueError(f"Shorts script quá ngắn ({word_count} từ).")
             logger.info(f"Shorts script: {word_count} từ")
             return shorts_script
         except Exception as e:
-            logger.warning(f"Shorts attempt {attempt+1}/3 thất bại: {e}")
+            err_str = str(e)
+            logger.warning(f"Shorts attempt {attempt+1}/3 thất bại: {err_str}")
             if attempt < 2:
-                time.sleep(5)
+                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
+                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
+                    time.sleep(45)
+                else:
+                    time.sleep(5)
 
     # Fallback: Dùng 140 từ đầu của full script
     words = full_script.split()[:140]

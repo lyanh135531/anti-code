@@ -107,7 +107,7 @@ def create_shorts_from_video(
         except Exception:
             font_ch = ImageFont.load_default()
 
-        ch_text = f"▶ {channel_name}"
+        ch_text = f"| {channel_name}"
         draw.text((W//2 - 120, top_h + 30), ch_text, font=font_ch, fill=(255, 220, 100))
 
         # ── Shorts label ───────────────────────────────────
@@ -156,6 +156,7 @@ def create_shorts_from_images(
     fps: int     = 24,
     W: int       = 1080,
     H: int       = 1920,
+    vtt_path:    str = None,
 ) -> str:
     """
     Tạo Shorts trực tiếp từ ảnh (không cần video gốc).
@@ -174,6 +175,13 @@ def create_shorts_from_images(
     img_dur      = total_dur / max(len(image_paths), 1)
 
     logger.info(f"Tạo Shorts từ {len(image_paths)} ảnh | {total_dur:.1f}s")
+
+    subs = []
+    if vtt_path and os.path.exists(vtt_path):
+        from modules.video_maker import parse_vtt, group_subs
+        raw_subs = parse_vtt(str(vtt_path))
+        subs = group_subs(raw_subs, max_words=4) # Shorts màn ngang hẹp, chỉ 4 từ
+        logger.info(f"Đã nạp {len(subs)} câu dòng phụ đề.")
 
     # Pre-load và resize tất cả ảnh
     portrait_imgs = []
@@ -219,10 +227,18 @@ def create_shorts_from_images(
         except Exception:
             font = ImageFont.load_default()
 
-        draw.text((W//2 - 150, H - 180), f"▶ {channel_name}", font=font, fill=(255, 220, 80))
+        draw.text((W//2 - 150, H - 180), f"| {channel_name}", font=font, fill=(255, 220, 80))
         draw.text((W//2 - 100, H - 100), "👍 Follow for more!", font=font, fill=(200, 200, 200))
 
-        return np.array(pil)
+        # Tích hợp Subtitle 
+        frame_arr = np.array(pil)
+        if subs:
+            from modules.video_maker import _add_subtitle_to_frame
+            for start, end, text in subs:
+                if start <= t <= end:
+                    frame_arr = _add_subtitle_to_frame(frame_arr, text, W, H, font_size=55, is_shorts=True)
+                    break
+        return frame_arr
 
     clip = VideoClip(make_frame, duration=total_dur).with_fps(fps)
     clip = clip.with_audio(audio_clip.subclipped(0, total_dur))

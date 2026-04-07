@@ -70,7 +70,7 @@ def _add_watermark_to_frame(frame: np.ndarray, channel_name: str) -> np.ndarray:
     draw = ImageDraw.Draw(pil)
 
     W, H = pil.size
-    text = f"◆ {channel_name}"
+    text = f"| {channel_name}"  # Thay thế ký tự dạng hình không tương thích bằng đường vạch |
 
     try:
         font = ImageFont.truetype("arial.ttf", 28) if os.name == 'nt' else ImageFont.load_default()
@@ -80,6 +80,85 @@ def _add_watermark_to_frame(frame: np.ndarray, channel_name: str) -> np.ndarray:
     draw.text((W - 305, H - 52), text, font=font, fill=(0, 0, 0, 160))
     draw.text((W - 307, H - 54), text, font=font, fill=(255, 255, 255, 200))
 
+    return np.array(pil)
+
+
+# ============================================================
+# SUBTITLE HELPERS
+# ============================================================
+
+def parse_vtt(vtt_path: str) -> list:
+    subs = []
+    if not os.path.exists(vtt_path): return subs
+    with open(vtt_path, "r", encoding="utf-8") as f:
+        content = f.read().split("\n\n")
+    for block in content:
+        lines = block.strip().split("\n")
+        for i, line in enumerate(lines):
+            if "-->" in line and i + 1 < len(lines):
+                times = line.split("-->")
+                if len(times) == 2:
+                    def to_sec(tc):
+                        parts = tc.strip().replace(",", ".").split(":")
+                        return sum(float(x) * 60 ** idx for idx, x in enumerate(reversed(parts)))
+                    try:
+                        subs.append((to_sec(times[0]), to_sec(times[1]), " ".join(lines[i+1:])))
+                    except Exception:
+                        pass
+                break
+    return subs
+
+def group_subs(subs: list, max_words=6) -> list:
+    grouped = []
+    if not subs: return grouped
+    
+    current_group = []
+    current_start = 0.0
+    
+    for i, (start, end, text) in enumerate(subs):
+        if not current_group:
+            current_start = start
+        current_group.append(text)
+        
+        is_punct = text.rstrip().endswith(('.', '!', '?', ',', ';'))
+        if len(current_group) >= max_words or is_punct or i == len(subs) - 1:
+            grouped.append((current_start, end, " ".join(current_group)))
+            current_group = []
+    return grouped
+
+def _add_subtitle_to_frame(frame: np.ndarray, text: str, W: int, H: int, font_size: int = 50, is_shorts: bool = False) -> np.ndarray:
+    if not text: return frame
+    
+    import textwrap
+    # Tự động ngắt dòng nếu text quá dài (30 ký tự cho Shorts, 50 ký tự cho ngang)
+    wrap_width = 22 if is_shorts else 50
+    text = textwrap.fill(text, width=wrap_width)
+
+    pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil)
+    
+    try:
+        font = ImageFont.truetype("arialbd.ttf", font_size) if os.name == 'nt' else ImageFont.load_default()
+    except OSError:
+        font = ImageFont.load_default()
+
+    if hasattr(draw, "textbbox"):
+        bbox = draw.textbbox((0, 0), text, font=font, align="center")
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+    else:
+        text_w, text_h = draw.textsize(text, font=font)
+        
+    x = (W - text_w) // 2
+    y = (H - text_h) // 2
+    
+    stroke_width = 3
+    for dx in range(-stroke_width, stroke_width+1):
+        for dy in range(-stroke_width, stroke_width+1):
+            if dx*dx + dy*dy <= stroke_width*stroke_width:
+                draw.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0), align="center")
+                
+    draw.text((x, y), text, font=font, fill=(255, 255, 0), align="center")
     return np.array(pil)
 
 
@@ -99,6 +178,7 @@ def build_video(
     W: int = 1920,
     H: int = 1080,
     fps: int = 24,
+    vtt_path: str = None,
 ) -> str:
     """
     Tạo video MP4 từ ảnh + audio (sử dụng lazy frame evaluation ránh tràn RAM).
@@ -160,6 +240,13 @@ def build_video(
     directions = ["in", "out"] * (n_imgs // 2 + 1)
     logger.info(f"Dựng {n_imgs} ảnh, img_dur: {img_dur:.1f}s, tổng video: {video_dur:.1f}s")
 
+    # Xử lý Subtitles
+    subs = []
+    if vtt_path and os.path.exists(vtt_path):
+        raw_subs = parse_vtt(vtt_path)
+        subs = group_subs(raw_subs, max_words=7) # Nhóm 7 từ cho video nằm ngang
+        logger.info(f"Đã tải {len(subs)} câu phụ đề.")
+
     # ── 4. Hàm generate khung hình động (lazy evaluation) ──
     def make_frame(t):
         idx = int(t / step_time)
@@ -178,9 +265,14 @@ def build_video(
             frame2 = get_ken_burns_frame(scaled_images[idx + 1], t_local_2, img_dur, W, H, directions[idx + 1])
             frame1 = ((1.0 - alpha) * frame1.astype(float) + alpha * frame2.astype(float)).astype(np.uint8)
         
-        # Chỉ chèn watermark sau mỗi 10 giây một frame (như code cũ) hoặc luôn luôn.
-        # Ở đây ta chèn watermark luôn 1 chỗ cố định để đẹp.
-        return _add_watermark_to_frame(frame1, channel_name)
+        frame1 = _add_watermark_to_frame(frame1, channel_name)
+        
+        for start, end, text in subs:
+            if start <= t <= end:
+                frame1 = _add_subtitle_to_frame(frame1, text, W, H, font_size=50, is_shorts=False)
+                break
+                
+        return frame1
 
     video_clip = VideoClip(make_frame, duration=video_dur)
     video_clip = video_clip.with_fps(fps)

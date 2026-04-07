@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def _configure_gemini():
     genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-2.5-flash")
+    return genai.GenerativeModel("gemini-3-flash-preview")
 
 
 def generate_seo_metadata(
@@ -78,7 +78,6 @@ IMPORTANT:
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.7,
                     max_output_tokens=1500,
-                    response_mime_type="application/json"
                 )
             )
 
@@ -124,9 +123,14 @@ IMPORTANT:
             if attempt < 2:
                 time.sleep(3)
         except Exception as e:
-            logger.warning(f"SEO attempt {attempt+1} lỗi: {e}")
+            err_str = str(e)
+            logger.warning(f"SEO attempt {attempt+1} lỗi: {err_str}")
             if attempt < 2:
-                time.sleep(5)
+                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
+                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
+                    time.sleep(45)
+                else:
+                    time.sleep(5)
 
     # Fallback: tạo metadata cơ bản nếu Gemini thất bại
     logger.warning("Dùng SEO metadata fallback")
