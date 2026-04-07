@@ -36,11 +36,10 @@ def create_shorts_from_video(
         Đường dẫn file shorts
     """
     try:
-        from moviepy.editor import (
+        from moviepy import (
             VideoFileClip, AudioFileClip, VideoClip,
-            CompositeVideoClip, ColorClip
+            CompositeVideoClip, ColorClip, vfx
         )
-        from moviepy.video.fx.all import resize, fadein, fadeout, crop
         import numpy as np
         from PIL import Image, ImageFilter, ImageDraw, ImageFont
     except ImportError:
@@ -58,14 +57,14 @@ def create_shorts_from_video(
     audio_dur    = min(shorts_audio.duration, max_duration)
     final_dur    = min(main_dur, audio_dur)
 
-    shorts_audio = shorts_audio.subclip(0, final_dur)
+    shorts_audio = shorts_audio.subclipped(0, final_dur)
 
     # ── 3. Tạo video Shorts bằng PIL frame-by-frame ───────
     # Lấy video gốc 1920x1080 và tạo layout 1080x1920:
     #   - Top 60%: Crop giữa video gốc → 1080x1152
     #   - Bottom 40%: Blur version của video + text overlay
 
-    main_clip_trimmed = main_clip.subclip(0, final_dur)
+    main_clip_trimmed = main_clip.subclipped(0, final_dur)
 
     def make_shorts_frame(t):
         # Lấy frame gốc
@@ -122,13 +121,11 @@ def create_shorts_from_video(
         return np.array(canvas, dtype=np.uint8)
 
     # Tạo VideoClip
-    shorts_clip = VideoClip(make_shorts_frame, duration=final_dur).set_fps(fps)
-    shorts_clip = shorts_clip.set_audio(shorts_audio)
+    shorts_clip = VideoClip(make_shorts_frame, duration=final_dur).with_fps(fps)
+    shorts_clip = shorts_clip.with_audio(shorts_audio)
 
     # Fade in/out
-    from moviepy.video.fx.all import fadein, fadeout
-    shorts_clip = fadein(shorts_clip, duration=0.5)
-    shorts_clip = fadeout(shorts_clip, duration=0.5)
+    shorts_clip = shorts_clip.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.5)])
 
     # ── 4. Export ──────────────────────────────────────────
     logger.info(f"Đang export Shorts ({final_dur:.1f}s)...")
@@ -139,8 +136,7 @@ def create_shorts_from_video(
         bitrate       = "4000k",    # Shorts cần bitrate cao hơn
         audio_bitrate = "128k",
         preset        = "fast",
-        logger        = None,
-        verbose       = False,
+        logger        = None
     )
 
     main_clip.close()
@@ -166,7 +162,7 @@ def create_shorts_from_images(
     Nhanh hơn phương pháp từ video chính.
     """
     try:
-        from moviepy.editor import AudioFileClip, VideoClip
+        from moviepy import AudioFileClip, VideoClip, vfx
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
     except ImportError:
@@ -228,12 +224,10 @@ def create_shorts_from_images(
 
         return np.array(pil)
 
-    clip = VideoClip(make_frame, duration=total_dur).set_fps(fps)
-    clip = clip.set_audio(audio_clip.subclip(0, total_dur))
+    clip = VideoClip(make_frame, duration=total_dur).with_fps(fps)
+    clip = clip.with_audio(audio_clip.subclipped(0, total_dur))
 
-    from moviepy.video.fx.all import fadein, fadeout
-    clip = fadein(clip, 0.3)
-    clip = fadeout(clip, 0.3)
+    clip = clip.with_effects([vfx.FadeIn(0.3), vfx.FadeOut(0.3)])
 
     clip.write_videofile(
         str(output_path),
@@ -242,8 +236,7 @@ def create_shorts_from_images(
         bitrate       = "4000k",
         audio_bitrate = "128k",
         preset        = "fast",
-        logger        = None,
-        verbose       = False,
+        logger        = None
     )
 
     clip.close()

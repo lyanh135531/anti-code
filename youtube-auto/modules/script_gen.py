@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _configure_gemini():
     """Cấu hình Gemini API."""
     genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-1.5-flash")
+    return genai.GenerativeModel("gemini-2.5-flash")
 
 
 def generate_video_script(topic_config: dict) -> dict:

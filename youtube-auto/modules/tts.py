@@ -95,7 +95,7 @@ def get_audio_duration(audio_path: str | Path) -> float:
     Dùng moviepy để đọc duration.
     """
     try:
-        from moviepy.editor import AudioFileClip
+        from moviepy import AudioFileClip
         with AudioFileClip(str(audio_path)) as audio:
             return audio.duration
     except Exception as e:

@@ -16,89 +16,48 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
-# XỬ LÝ ẢNH: KEN BURNS EFFECT
+# XỬ LÝ ẢNH: KEN BURNS EFFECT (LAZY LOADING - TIẾT KIỆM RAM)
 # ============================================================
 
-def _make_ken_burns_frames(
-    img_path: str,
-    duration: float,
-    W: int = 1920,
-    H: int = 1080,
-    fps: int = 24,
-    direction: str = "in"
-) -> np.ndarray:
-    """
-    Tạo các frame cho hiệu ứng Ken Burns (zoom + pan).
-    direction: "in" (zoom vào) hoặc "out" (zoom ra)
-    
-    Returns:
-        numpy array shape (n_frames, H, W, 3)
-    """
+def load_scaled_image(img_path: str, W: int = 1920, H: int = 1080) -> np.ndarray:
+    """Tải và scale ảnh sẵn 1 lần, lưu vào RAM thay vì lưu toàn bộ frame."""
     img = Image.open(img_path).convert("RGB")
-
-    # Scale ảnh để lớn hơn target (cần zoom)
     scale = max(W / img.width, H / img.height) * 1.18
     new_w = int(img.width * scale)
     new_h = int(img.height * scale)
-    img   = img.resize((new_w, new_h), Image.LANCZOS)
-    arr   = np.array(img, dtype=np.uint8)
-
-    n_frames = int(duration * fps)
-    frames   = []
-
-    for i in range(n_frames):
-        t        = i / max(n_frames - 1, 1)  # 0.0 → 1.0
-        progress = t if direction == "in" else (1.0 - t)
-
-        zoom = 1.0 + 0.12 * progress  # Zoom 0% → 12%
-
-        # Kích thước crop (chia zoom hệ số)
-        crop_w = int(W / zoom)
-        crop_h = int(H / zoom)
-
-        # Pan ngang nhẹ
-        pan_x = int((new_w - crop_w) * 0.5 + (new_w - crop_w) * 0.1 * progress)
-        pan_y = int((new_h - crop_h) * 0.5)
-
-        # Clamp
-        pan_x = max(0, min(pan_x, new_w - crop_w))
-        pan_y = max(0, min(pan_y, new_h - crop_h))
-
-        crop = arr[pan_y:pan_y + crop_h, pan_x:pan_x + crop_w]
-
-        # Resize về W×H bằng PIL (nhanh hơn scipy)
-        pil_crop = Image.fromarray(crop).resize((W, H), Image.BILINEAR)
-        frames.append(np.array(pil_crop, dtype=np.uint8))
-
-    return np.stack(frames, axis=0)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    return np.array(img, dtype=np.uint8)
 
 
-# ============================================================
-# CROSSFADE GIỮA 2 CLIP
-# ============================================================
+def get_ken_burns_frame(
+    arr: np.ndarray, 
+    t_local: float, 
+    duration: float, 
+    W: int = 1920, 
+    H: int = 1080, 
+    direction: str = "in"
+) -> np.ndarray:
+    """Tính toán on-the-fly 1 frame cho hiệu ứng Ken Burns tại thời gian t_local."""
+    progress = t_local / max(duration, 0.001)
+    progress = max(0.0, min(1.0, progress))
+    if direction == "out":
+        progress = 1.0 - progress
 
-def _crossfade(frames_a: np.ndarray, frames_b: np.ndarray, n_fade: int) -> np.ndarray:
-    """
-    Ghép 2 mảng frames với hiệu ứng crossfade.
-    frames_a: (Na, H, W, 3)
-    frames_b: (Nb, H, W, 3)
-    n_fade:   Số frame crossfade
-    """
-    n_fade = min(n_fade, len(frames_a), len(frames_b))
+    zoom = 1.0 + 0.12 * progress
+    crop_w = int(W / zoom)
+    crop_h = int(H / zoom)
+
+    new_h, new_w = arr.shape[:2]
     
-    main_a   = frames_a[:-n_fade]  # Phần chính của clip A
-    fade_a   = frames_a[-n_fade:]  # Phần cuối A (fade out)
-    fade_b   = frames_b[:n_fade]   # Phần đầu B (fade in)
-    main_b   = frames_b[n_fade:]   # Phần chính của clip B
+    pan_x = int((new_w - crop_w) * 0.5 + (new_w - crop_w) * 0.1 * progress)
+    pan_y = int((new_h - crop_h) * 0.5)
 
-    blended = []
-    for i in range(n_fade):
-        alpha = i / n_fade
-        mix   = ((1 - alpha) * fade_a[i].astype(float) +
-                  alpha       * fade_b[i].astype(float)).astype(np.uint8)
-        blended.append(mix)
+    pan_x = max(0, min(pan_x, new_w - crop_w))
+    pan_y = max(0, min(pan_y, new_h - crop_h))
 
-    return np.concatenate([main_a, np.stack(blended), main_b], axis=0)
+    crop = arr[pan_y:pan_y + crop_h, pan_x:pan_x + crop_w]
+    pil_crop = Image.fromarray(crop).resize((W, H), Image.BILINEAR)
+    return np.array(pil_crop, dtype=np.uint8)
 
 
 # ============================================================
@@ -113,15 +72,12 @@ def _add_watermark_to_frame(frame: np.ndarray, channel_name: str) -> np.ndarray:
     W, H = pil.size
     text = f"◆ {channel_name}"
 
-    # Font
     try:
-        font = ImageFont.truetype("arial.ttf", 28)
+        font = ImageFont.truetype("arial.ttf", 28) if os.name == 'nt' else ImageFont.load_default()
     except OSError:
         font = ImageFont.load_default()
 
-    # Vẽ shadow
     draw.text((W - 305, H - 52), text, font=font, fill=(0, 0, 0, 160))
-    # Vẽ chữ trắng
     draw.text((W - 307, H - 54), text, font=font, fill=(255, 255, 255, 200))
 
     return np.array(pil)
@@ -145,7 +101,7 @@ def build_video(
     fps: int = 24,
 ) -> str:
     """
-    Tạo video MP4 từ ảnh + audio.
+    Tạo video MP4 từ ảnh + audio (sử dụng lazy frame evaluation ránh tràn RAM).
 
     Args:
         image_paths:   Danh sách đường dẫn ảnh
@@ -161,9 +117,8 @@ def build_video(
         Đường dẫn video đã tạo
     """
     try:
-        from moviepy.editor import (
-            AudioFileClip, VideoClip, CompositeAudioClip,
-            AudioFileClip as AFC
+        from moviepy import (
+            AudioFileClip, VideoClip, CompositeAudioClip, vfx, afx
         )
     except ImportError:
         raise ImportError("Hãy cài: pip install moviepy")
@@ -176,84 +131,85 @@ def build_video(
     total_audio  = audio_clip.duration
     logger.info(f"Audio duration: {total_audio:.1f}s")
 
-    # ── 2. Tính số frame mỗi ảnh ───────────────────────────
-    n_imgs    = len(image_paths)
-    n_fade    = int(fade_duration * fps)
-    # Điều chỉnh img_duration để tổng khớp audio
-    total_duration = total_audio + 2.0  # 2s buffer ở cuối
-    img_dur   = max(3.0, total_duration / n_imgs)
-
-    directions = ["in", "out"] * (n_imgs // 2 + 1)  # Xen kẽ zoom in/out
-
-    # ── 3. Tạo frames cho tất cả ảnh ───────────────────────
-    all_frames = None
-    for i, img_path in enumerate(image_paths):
-        logger.info(f"  Render ảnh {i+1}/{n_imgs}: {Path(img_path).name}")
+    # ── 2. Tải và chuẩn bị mảng ảnh (tránh lỗi RAM) ────────
+    scaled_images = []
+    valid_paths = []
+    for img_path in image_paths:
         try:
-            frames = _make_ken_burns_frames(
-                img_path, img_dur, W, H, fps, direction=directions[i]
-            )
+            arr = load_scaled_image(img_path, W, H)
+            scaled_images.append(arr)
+            valid_paths.append(img_path)
         except Exception as e:
-            logger.warning(f"  Lỗi ảnh {img_path}: {e} — bỏ qua")
-            continue
+            logger.warning(f"Lỗi đọc ảnh {img_path}: {e} — bỏ qua")
 
-        if all_frames is None:
-            all_frames = frames
-        else:
-            all_frames = _crossfade(all_frames, frames, n_fade)
+    n_imgs = len(scaled_images)
+    if n_imgs == 0:
+        raise RuntimeError("Không có ảnh nào đọc được!")
 
-    if all_frames is None:
-        raise RuntimeError("Không có frame nào được tạo!")
+    # ── 3. Tính toán thời lượng khớp audio ─────────────────
+    target_dur = total_audio + 2.0  # 2s buffer ở cuối
+    
+    # n_imgs = số ảnh. Công thức tổng duration = img_dur + (n_imgs - 1)*(img_dur - fade_duration)
+    # => target_dur = img_dur * n_imgs - fade_duration * (n_imgs - 1)
+    img_dur = (target_dur + fade_duration * (n_imgs - 1)) / n_imgs
+    img_dur = max(3.0, img_dur)
+    
+    step_time = img_dur - fade_duration
+    video_dur = img_dur + (n_imgs - 1) * step_time
 
-    total_frames = len(all_frames)
-    video_dur    = total_frames / fps
-    logger.info(f"Tổng: {total_frames} frames = {video_dur:.1f}s")
+    directions = ["in", "out"] * (n_imgs // 2 + 1)
+    logger.info(f"Dựng {n_imgs} ảnh, img_dur: {img_dur:.1f}s, tổng video: {video_dur:.1f}s")
 
-    # ── 4. Thêm watermark vào 1 vài frame (không phải tất cả để nhanh hơn) ──
-    # Thêm watermark vào frame cuối mỗi segment
-    watermark_interval = fps * 10   # Mỗi 10 giây 1 watermark
-    for fi in range(0, total_frames, watermark_interval):
-        all_frames[fi] = _add_watermark_to_frame(all_frames[fi], channel_name)
-
-    # ── 5. Tạo VideoClip từ frames ─────────────────────────
+    # ── 4. Hàm generate khung hình động (lazy evaluation) ──
     def make_frame(t):
-        fi = min(int(t * fps), total_frames - 1)
-        return all_frames[fi]
+        idx = int(t / step_time)
+        if idx >= n_imgs:
+            idx = n_imgs - 1
+            
+        t_local_1 = t - idx * step_time
+        frame1 = get_ken_burns_frame(scaled_images[idx], t_local_1, img_dur, W, H, directions[idx])
+        
+        # Crossfade nếu trong vùng chuyển tiếp
+        if t_local_1 > step_time and idx + 1 < n_imgs:
+            alpha = (t_local_1 - step_time) / fade_duration
+            alpha = max(0.0, min(1.0, alpha))
+            
+            t_local_2 = t - (idx + 1) * step_time
+            frame2 = get_ken_burns_frame(scaled_images[idx + 1], t_local_2, img_dur, W, H, directions[idx + 1])
+            frame1 = ((1.0 - alpha) * frame1.astype(float) + alpha * frame2.astype(float)).astype(np.uint8)
+        
+        # Chỉ chèn watermark sau mỗi 10 giây một frame (như code cũ) hoặc luôn luôn.
+        # Ở đây ta chèn watermark luôn 1 chỗ cố định để đẹp.
+        return _add_watermark_to_frame(frame1, channel_name)
 
     video_clip = VideoClip(make_frame, duration=video_dur)
-    video_clip = video_clip.set_fps(fps)
+    video_clip = video_clip.with_fps(fps)
 
-    # ── 6. Ghép audio ──────────────────────────────────────
-    # Trim audio nếu video ngắn hơn audio
+    # ── 5. Ghép audio ──────────────────────────────────────
     if total_audio > video_dur:
-        audio_clip = audio_clip.subclip(0, video_dur)
+        audio_clip = audio_clip.subclipped(0, video_dur)
     
     if music_path and os.path.exists(music_path):
         try:
-            music_clip = AudioFileClip(str(music_path)).volumex(music_volume)
-            # Loop nhạc nếu cần
+            music_clip = AudioFileClip(str(music_path)).with_volume_scaled(music_volume)
             if music_clip.duration < video_dur:
-                loops = int(video_dur / music_clip.duration) + 1
-                from moviepy.audio.fx.all import audio_loop
-                music_clip = audio_loop(music_clip, nloops=loops).subclip(0, video_dur)
+                music_clip = music_clip.with_effects([afx.AudioLoop(duration=video_dur)]).subclipped(0, video_dur)
             else:
-                music_clip = music_clip.subclip(0, video_dur)
+                music_clip = music_clip.subclipped(0, video_dur)
             final_audio = CompositeAudioClip([audio_clip, music_clip])
-            logger.info(f"Đã thêm nhạc nền: {Path(music_path).name}")
+            logger.info(f"Đã thêm nhạc nền.")
         except Exception as e:
             logger.warning(f"Không thể thêm nhạc nền: {e}")
             final_audio = audio_clip
     else:
         final_audio = audio_clip
 
-    video_clip = video_clip.set_audio(final_audio)
+    video_clip = video_clip.with_audio(final_audio)
 
-    # ── 7. Fade in / Fade out ──────────────────────────────
-    from moviepy.video.fx.all import fadein, fadeout
-    video_clip = fadein(video_clip, duration=1.0)
-    video_clip = fadeout(video_clip, duration=1.5)
+    # ── 6. Fade in / Fade out ──────────────────────────────
+    video_clip = video_clip.with_effects([vfx.FadeIn(1.0), vfx.FadeOut(1.5)])
 
-    # ── 8. Export ──────────────────────────────────────────
+    # ── 7. Export ──────────────────────────────────────────
     logger.info(f"Đang export video (có thể mất vài phút)...")
     video_clip.write_videofile(
         str(output_path),
@@ -261,16 +217,14 @@ def build_video(
         audio_codec = "aac",
         bitrate     = "3000k",
         audio_bitrate = "192k",
-        preset      = "fast",        # "fast" vs "slow" — cân bằng tốc độ/chất lượng
-        ffmpeg_params = ["-movflags", "+faststart"],  # Cho phép stream nhanh
-        logger      = None,          # Tắt progress bar verbose
-        verbose     = False,
+        preset      = "fast",
+        ffmpeg_params = ["-movflags", "+faststart"],
+        logger      = None
     )
 
-    # Cleanup
     audio_clip.close()
     video_clip.close()
 
     size_mb = output_path.stat().st_size / 1024 / 1024
-    logger.info(f"✅ Video hoàn thành: {output_path} ({size_mb:.1f} MB)")
+    logger.info(f"✅ Video hoàn thành: {output_path.name} ({size_mb:.1f} MB)")
     return str(output_path)

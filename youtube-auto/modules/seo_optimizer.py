@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def _configure_gemini():
     genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-1.5-flash")
+    return genai.GenerativeModel("gemini-2.5-flash")
 
 
 def generate_seo_metadata(
@@ -78,17 +78,33 @@ IMPORTANT:
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.7,
                     max_output_tokens=1500,
+                    response_mime_type="application/json"
                 )
             )
 
-            raw = response.text.strip()
+            raw = response.text.strip() if response.text else ""
 
-            # Trích xuất JSON từ response (đôi khi Gemini thêm markdown)
+            # Xóa các markdown block trong trường hợp Gemini vẫn trả về dù dùng JSON mode
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            if raw.startswith("```"):
+                raw = raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+
             json_match = re.search(r'\{.*\}', raw, re.DOTALL)
             if json_match:
                 raw = json_match.group()
+                
+            if not raw:
+                raise ValueError("Empty response or no JSON found")
 
-            metadata = json.loads(raw)
+            try:
+                metadata = json.loads(raw)
+            except json.JSONDecodeError as e:
+                # Xử lý an toàn hơn khi parse do chuỗi có thể chứa \n \t không escape
+                metadata = json.loads(raw, strict=False)
 
             # Merge tags với BASE_TAGS và dedup
             all_tags = metadata.get("tags", [])
