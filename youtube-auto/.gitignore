@@ -21,6 +21,15 @@ output/
 .idea/
 .DS_Store
 Thumbs.db
+.topic_history.txt
+
+# MoviePy & Media Temp Files
+*TEMP_MPY*
+*.mp4
+*.mp3
+*.wav
+!assets/music/*.mp3
+!assets/music/*.wav
 
 # Extra
 *.log

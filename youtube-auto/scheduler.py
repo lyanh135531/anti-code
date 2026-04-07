@@ -37,8 +37,8 @@ logger = logging.getLogger("scheduler")
 
 # Giờ chạy pipeline mỗi ngày (tạo video)
 # Video sẽ được lên lịch đăng lúc PUBLISH_HOUR
-PIPELINE_RUN_HOUR  = "08:00"   # 8 giờ sáng tạo video
-PUBLISH_HOUR       = 18        # 6 giờ tối đăng lên YouTube
+PIPELINE_RUN_HOUR  = "17:00"   # 5 giờ chiều tạo video
+PUBLISH_HOUR       = 19        # 7 giờ tối đăng lên YouTube
 CREATE_SHORTS      = True      # Tạo Shorts kèm theo
 UPLOAD_IMMEDIATELY = False     # False = lên lịch, True = đăng ngay
 
@@ -50,7 +50,6 @@ def run_daily_pipeline():
     try:
         from main import run_pipeline
         results = run_pipeline(
-            topic_index   = None,         # Tự động chọn topic
             upload        = True,
             make_shorts   = CREATE_SHORTS,
             dry_run       = False,

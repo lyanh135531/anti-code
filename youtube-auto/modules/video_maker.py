@@ -314,6 +314,15 @@ def build_video(
         logger      = None
     )
 
+    if music_path and os.path.exists(music_path):
+        try:
+            music_clip.close()
+        except: pass
+    
+    try:
+        final_audio.close()
+    except: pass
+
     audio_clip.close()
     video_clip.close()
 

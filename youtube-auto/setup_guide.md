@@ -210,10 +210,10 @@ set RUN_NOW=true && python scheduler.py
 2. Click **"Create Basic Task"**
 3. Điền:
    - Name: `YouTube Auto Pipeline`
-   - Trigger: **Daily** → lúc `08:00`
+   - Trigger: **Daily** → lúc `17:00`
 4. Action: **Start a program**
    - Program: `C:\Project\anti-code\youtube-auto\venv\Scripts\python.exe`
-   - Arguments: `main.py --schedule 18`
+   - Arguments: `main.py --schedule 19`
    - Start in: `C:\Project\anti-code\youtube-auto`
 5. **Finish**
 
@@ -262,7 +262,7 @@ python main.py --help                 # Xem tất cả tùy chọn
 ## 💡 Tips tăng view
 
 1. **Nhạc nền nhẹ nhàng** → Tăng watch time, thuật toán ưu ái
-2. **Đăng lúc 6pm VN** = 6am EST → Khán giả Mỹ/Anh đang thức dậy
-3. **Đăng đều đặn 1 video/ngày** → YouTube thuật toán ưu tiên kênh đều đặn
-4. **18 chủ đề xoay vòng** → Pipeline tự động, không bao giờ lặp lại topic
-5. **YouTube Shorts** → Upload cùng lúc, tăng gấp đôi tiếp cận
+2. **Đăng lúc 7pm VN** → Khung giờ vàng khán giả Việt Nam và buổi sáng tại Mỹ
+3. **Đăng đều đặn 1 video/ngày** → Thuật toán ưu tiên kênh có tần suất ổn định
+4. **Ý tưởng không giới hạn** → Pipeline tự động nghĩ topic mới, không bao giờ cạn kiệt
+5. **YouTube Shorts** → Tự động tạo kèm theo để kéo view nhanh nhất

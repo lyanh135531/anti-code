@@ -207,17 +207,24 @@ def run_pipeline(
         results["errors"].append(f"Images: {e}")
         return results
 
-    # ── BƯỚC 5: Tạo Thumbnail ────────────────────────────
+        # ── BƯỚC 5: Tạo Thumbnail ────────────────────────────
     logger.info("\n[5/9] 🎨 Tạo thumbnail...")
     thumbnail_path = None
     try:
         thumb_out = str(OUTPUT_DIR / "thumbnails" / f"{video_id}_thumb.jpg")
+        
+        # Tối ưu title cho thumbnail: Xóa tên channel nếu AI lỡ viết vào
+        display_title = seo_meta.get("title", topic_config["topic"])
+        for suffix in [f" | {CHANNEL_NAME}", f" - {CHANNEL_NAME}", f"|{CHANNEL_NAME}", f"-{CHANNEL_NAME}"]:
+            if display_title.endswith(suffix):
+                display_title = display_title[:-len(suffix)].strip()
+
         thumbnail_path = create_thumbnail(
-            image_path  = image_paths[0],  # Ảnh đầu tiên làm thumbnail
-            title       = seo_meta["title"],
+            image_path  = image_paths[0],
+            title       = display_title,
             religion    = topic_config["religion"],
             output_path = thumb_out,
-            subtitle    = CHANNEL_NAME,
+            subtitle    = "", # Đã xóa subtitle theo yêu cầu
         )
         results["thumbnail_path"] = thumbnail_path
         logger.info(f"  ✅ Thumbnail: {thumb_out}")
