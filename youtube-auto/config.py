@@ -112,3 +112,12 @@ RELIGION_COLORS = {
 # CHỦ ĐỀ VIDEO (Autonomous AI generation)
 # ============================================================
 TARGET_RELIGION = "Christianity"
+
+# ============================================================
+# AI IMAGE MODELS (google-genai)
+# ============================================================
+IMAGEN_MODEL = "gemini-2.5-flash-image"
+# Các lựa chọn (yêu cầu Billing):
+#   "gemini-3.1-flash-image-preview" - Nano Banana 2 (nhanh hơn, yêu cầu paid)
+#   "gemini-3-pro-image-preview"     - Nano Banana Pro (chất lượng cao nhất, paid)
+#   "imagen-4.0-generate-001"        - Imagen 4.0 chuyên dụng (paid)

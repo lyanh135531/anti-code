@@ -23,6 +23,7 @@ import logging
 import argparse
 import json
 import time
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -54,7 +55,7 @@ from config import (
 # ── Import modules ────────────────────────────────────────--
 from modules.script_gen    import generate_video_script, generate_shorts_script, save_script
 from modules.tts           import text_to_speech, get_audio_duration
-from modules.image_fetch   import fetch_images_for_topic
+from modules.gemini_image_gen import generate_shorts_images, generate_single_image
 from modules.video_maker   import build_video
 from modules.thumbnail_maker import create_thumbnail
 from modules.shorts_maker  import create_shorts_from_images
@@ -62,7 +63,28 @@ from modules.seo_optimizer import generate_seo_metadata, format_description_for_
 from modules.uploader      import upload_video, upload_shorts, get_channel_info
 
 
+def _parse_visual_scenes(script_text: str) -> list[dict]:
+    """
+    Tách [SCENE: ...] và phần text nói tương ứng.
+    Trả về list [{'visual_prompt': '...', 'text': '...'}]
+    """
+    scenes = []
+    # Regex tìm [SCENE: description] và text sau đó cho tới [SCENE:] tiếp theo
+    pattern = r'\[SCENE:\s*(.*?)\](.*?)(?=\[SCENE:|$)'
+    matches = re.findall(pattern, script_text, re.DOTALL)
+    
+    for prompt, text in matches:
+        clean_text = re.sub(r'\[SECTION:.*?\]', '', text).strip()
+        scenes.append({
+            "visual_prompt": prompt.strip(),
+            "text": clean_text
+        })
+    return scenes
 
+
+def _clean_script_for_tts(script_text: str) -> str:
+    """Xóa tất cả các marker [SCENE: ...] để đưa vào TTS."""
+    return re.sub(r'\[SCENE:.*?\]', '', script_text).strip()
 
 
 def _get_background_music() -> str | None:
@@ -97,15 +119,6 @@ def run_pipeline(
 ) -> dict:
     """
     Chạy toàn bộ pipeline tạo video.
-    
-    Args:
-        upload:       Upload lên YouTube sau khi tạo
-        make_shorts:  Tạo YouTube Shorts kèm theo
-        dry_run:      Tạo file nhưng không upload
-        schedule_hour: Giờ lên lịch đăng (0-23, None = đăng ngay)
-        
-    Returns:
-        Dict kết quả pipeline
     """
     start_time = time.time()
     results = {
@@ -120,7 +133,7 @@ def run_pipeline(
     }
 
     logger.info("=" * 60)
-    logger.info("  🚀 BẮT ĐẦU PIPELINE YOUTUBE AUTO")
+    logger.info("  🚀 BẮT ĐẦU PIPELINE YOUTUBE AUTO AI-FIRST")
     logger.info("=" * 60)
 
     # ── BƯỚC 0: Chọn Topic ────────────────────────────────
@@ -134,14 +147,14 @@ def run_pipeline(
     logger.info(f"🆔 Video ID: {video_id}")
 
     # ── BƯỚC 1: Tạo Script ────────────────────────────────
-    logger.info("\n[1/9] 📝 Tạo nội dung script...")
+    logger.info("\n[1/9] 📝 Tạo nội dung script & visual prompts...")
     try:
         script_data  = generate_video_script(topic_config)
-        main_script  = script_data["script"]
+        raw_script   = script_data["script"]
+        main_script  = _clean_script_for_tts(raw_script)
 
         # Lưu script
-        script_path = OUTPUT_DIR / "scripts" / f"{video_id}.txt"
-        save_script(main_script, video_id, OUTPUT_DIR / "scripts")
+        save_script(raw_script, video_id, OUTPUT_DIR / "scripts")
         logger.info(f"  ✅ Script: {script_data['word_count']} từ")
     except Exception as e:
         logger.error(f"  ❌ Lỗi tạo script: {e}")
@@ -158,7 +171,6 @@ def run_pipeline(
         logger.info(f"  ✅ Tags: {len(seo_meta['tags'])} tags")
     except Exception as e:
         logger.warning(f"  ⚠️ SEO lỗi (dùng fallback): {e}")
-        # Dùng title từ topic_config
         seo_meta = {
             "title":              topic_config["topic"][:100],
             "description":        main_script[:300] + "...",
@@ -168,7 +180,7 @@ def run_pipeline(
         }
 
     # ── BƯỚC 3: Text-to-Speech (Video dài) ───────────────
-    logger.info("\n[3/9] 🗣️ Tạo giọng đọc (video dài)...")
+    logger.info("\n[3/9] 🗣️ Tạo giọng đọc...")
     try:
         audio_main_path = str(OUTPUT_DIR / "audio" / f"{video_id}_main.mp3")
         text_to_speech(
@@ -179,61 +191,60 @@ def run_pipeline(
             pitch     = TTS_PITCH,
         )
         audio_dur = get_audio_duration(audio_main_path)
-        logger.info(f"  ✅ Audio: {audio_dur:.1f}s ({audio_main_path})")
+        logger.info(f"  ✅ Audio: {audio_dur:.1f}s")
     except Exception as e:
         logger.error(f"  ❌ Lỗi TTS: {e}")
         results["errors"].append(f"TTS: {e}")
         return results
 
-    # ── BƯỚC 4: Tải Ảnh ──────────────────────────────────
-    logger.info("\n[4/9] 🖼️ Tải ảnh từ Pexels + Pixabay...")
+    # ── BƯỚC 4: Tạo Ảnh AI ──────────────────────────────────
+    logger.info("\n[4/9] 🎨 Tạo ảnh bằng Gemini Imagen AI...")
     try:
         img_dir = OUTPUT_DIR / "images" / video_id
         img_dir.mkdir(parents=True, exist_ok=True)
-
-        image_paths = fetch_images_for_topic(
-            topic_config = topic_config,
-            output_dir   = img_dir,
-            max_images   = MAX_IMAGES,
-            video_id     = video_id,
+        
+        main_scenes = _parse_visual_scenes(raw_script)
+        image_paths = generate_shorts_images(
+            scenes     = main_scenes[:MAX_IMAGES],
+            output_dir = img_dir,
+            video_id   = video_id
         )
 
         if not image_paths:
-            raise RuntimeError("Không tải được ảnh nào!")
+            raise RuntimeError("Không tạo được ảnh AI nào!")
 
-        logger.info(f"  ✅ Tải được {len(image_paths)} ảnh")
+        logger.info(f"  ✅ Đã tạo {len(image_paths)} ảnh AI độc bản")
     except Exception as e:
-        logger.error(f"  ❌ Lỗi tải ảnh: {e}")
+        logger.error(f"  ❌ Lỗi tạo ảnh AI: {e}")
         results["errors"].append(f"Images: {e}")
         return results
 
-        # ── BƯỚC 5: Tạo Thumbnail ────────────────────────────
-    logger.info("\n[5/9] 🎨 Tạo thumbnail...")
+    # ── BƯỚC 5: Tạo Thumbnail AI ────────────────────────────
+    logger.info("\n[5/9] 🖌️ Tạo thumbnail AI...")
     thumbnail_path = None
     try:
-        thumb_out = str(OUTPUT_DIR / "thumbnails" / f"{video_id}_thumb.jpg")
+        thumb_bg_path = img_dir / f"{video_id}_thumb_bg.png"
+        thumb_prompt = f"YouTube Thumbnail background for video about {topic_config['topic']}, epic lighting, professional, {topic_config['religion']}"
         
-        # Tối ưu title cho thumbnail: Xóa tên channel nếu AI lỡ viết vào
+        generate_single_image(thumb_prompt, thumb_bg_path)
+        
+        thumb_out = str(OUTPUT_DIR / "thumbnails" / f"{video_id}_thumb.jpg")
         display_title = seo_meta.get("title", topic_config["topic"])
-        for suffix in [f" | {CHANNEL_NAME}", f" - {CHANNEL_NAME}", f"|{CHANNEL_NAME}", f"-{CHANNEL_NAME}"]:
-            if display_title.endswith(suffix):
-                display_title = display_title[:-len(suffix)].strip()
 
         thumbnail_path = create_thumbnail(
-            image_path  = image_paths[0],
+            image_path  = str(thumb_bg_path),
             title       = display_title,
             religion    = topic_config["religion"],
             output_path = thumb_out,
-            subtitle    = "", # Đã xóa subtitle theo yêu cầu
         )
         results["thumbnail_path"] = thumbnail_path
-        logger.info(f"  ✅ Thumbnail: {thumb_out}")
+        logger.info(f"  ✅ Thumbnail AI: {thumb_out}")
     except Exception as e:
-        logger.warning(f"  ⚠️ Thumbnail lỗi (bỏ qua): {e}")
+        logger.warning(f"  ⚠️ Thumbnail lỗi: {e}")
         results["errors"].append(f"Thumbnail: {e}")
 
     # ── BƯỚC 6: Dựng Video Chính ─────────────────────────
-    logger.info("\n[6/9] 🎬 Dựng video chính (1920x1080)...")
+    logger.info("\n[6/9] 🎬 Dựng video chính...")
     video_path = None
     try:
         music_path = _get_background_music()
@@ -246,7 +257,7 @@ def run_pipeline(
             channel_name  = CHANNEL_NAME,
             music_path    = music_path,
             music_volume  = 0.08,
-            img_duration  = IMAGE_DURATION,
+            img_duration  = audio_dur / len(image_paths) if image_paths else 6.0,
             fade_duration = FADE_DURATION,
             W             = VIDEO_WIDTH,
             H             = VIDEO_HEIGHT,
@@ -254,47 +265,42 @@ def run_pipeline(
             vtt_path      = audio_main_path.replace(".mp3", ".srt"),
         )
         results["video_path"] = video_path
-        size_mb = Path(video_path).stat().st_size / 1024 / 1024
-        logger.info(f"  ✅ Video: {size_mb:.1f} MB")
+        logger.info(f"  ✅ Video chính hoàn thành")
     except Exception as e:
         logger.error(f"  ❌ Lỗi dựng video: {e}")
         results["errors"].append(f"Video: {e}")
         return results
 
-    # ── BƯỚC 7: Tạo YouTube Shorts ───────────────────────
+    # ── BƯỚC 7: Tạo YouTube Shorts AI ───────────────────────
     shorts_path = None
     if make_shorts:
-        logger.info("\n[7/9] ⚡ Tạo YouTube Shorts (1080x1920)...")
+        logger.info("\n[7/9] ⚡ Tạo YouTube Shorts AI (9:16)...")
         try:
-            # Tạo script ngắn cho Shorts
-            shorts_script = generate_shorts_script(topic_config, main_script)
-            save_script(shorts_script, f"{video_id}_shorts", OUTPUT_DIR / "scripts")
+            shorts_raw    = generate_shorts_script(topic_config, raw_script)
+            shorts_scenes = _parse_visual_scenes(shorts_raw)
+            shorts_script = _clean_script_for_tts(shorts_raw)
+            
+            # Tạo ảnh riêng cho Shorts (Portrait)
+            shorts_img_dir = img_dir / "shorts"
+            shorts_image_paths = generate_shorts_images(shorts_scenes, shorts_img_dir, f"{video_id}_sh")
 
-            # TTS cho Shorts (nhanh hơn, giọng hơi nhanh)
             shorts_audio_path = str(OUTPUT_DIR / "audio" / f"{video_id}_shorts.mp3")
-            text_to_speech(
-                script      = shorts_script,
-                output_path = shorts_audio_path,
-                voice       = TTS_VOICE,
-                rate        = "+5%",   # Nhanh hơn chút cho Shorts
-                pitch       = TTS_PITCH,
-            )
+            text_to_speech(shorts_script, shorts_audio_path, voice=TTS_VOICE, rate="+5%")
 
-            # Tạo video Shorts từ ảnh (nhanh hơn từ video gốc)
             shorts_out = str(OUTPUT_DIR / "shorts" / f"{video_id}_shorts.mp4")
             shorts_path = create_shorts_from_images(
-                image_paths  = image_paths[:6],  # Dùng 6 ảnh đầu
+                image_paths  = shorts_image_paths,
                 audio_path   = shorts_audio_path,
                 output_path  = shorts_out,
                 channel_name = CHANNEL_NAME,
-                fps          = FPS,
                 vtt_path     = shorts_audio_path.replace(".mp3", ".srt"),
             )
             results["shorts_path"] = shorts_path
-            logger.info(f"  ✅ Shorts: {shorts_out}")
+            logger.info(f"  ✅ Shorts AI hoàn thành")
         except Exception as e:
-            logger.warning(f"  ⚠️ Shorts lỗi (bỏ qua): {e}")
+            logger.warning(f"  ⚠️ Shorts lỗi: {e}")
             results["errors"].append(f"Shorts: {e}")
+
 
     # ── BƯỚC 8: Tính giờ đăng ────────────────────────────
     publish_at = None

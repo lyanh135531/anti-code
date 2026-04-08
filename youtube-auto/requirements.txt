@@ -12,3 +12,4 @@ numpy>=1.26.0
 schedule>=1.2.0
 imageio>=2.34.0
 imageio-ffmpeg>=0.4.9
+google-genai>=1.0.0

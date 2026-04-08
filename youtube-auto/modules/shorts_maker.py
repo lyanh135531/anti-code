@@ -152,15 +152,17 @@ def create_shorts_from_images(
     image_paths:  list[str],
     audio_path:   str | Path,
     output_path:  str | Path,
-    channel_name: str = "Sacred Wisdom Daily",
+    channel_name: str = "Sacred Wisdom",
     fps: int     = 24,
     W: int       = 1080,
     H: int       = 1920,
     vtt_path:    str = None,
 ) -> str:
     """
-    Tạo Shorts trực tiếp từ ảnh (không cần video gốc).
-    Nhanh hơn phương pháp từ video chính.
+    Tạo Shorts chuyên nghiệp từ ảnh AI.
+    - Hiệu ứng Ken Burns (zoom chậm)
+    - Phụ đề trung tâm, cụm 3-4 từ
+    - Không logo, tập trung thị trường quốc tế (Anh)
     """
     try:
         from moviepy import AudioFileClip, VideoClip, vfx
@@ -171,93 +173,129 @@ def create_shorts_from_images(
 
     output_path  = Path(output_path)
     audio_clip   = AudioFileClip(str(audio_path))
-    total_dur    = min(audio_clip.duration, 58.0)
-    img_dur      = total_dur / max(len(image_paths), 1)
+    total_dur    = min(audio_clip.duration, 59.0)
+    
+    # Tính thời lượng mỗi ảnh
+    n_imgs = len(image_paths)
+    img_dur = total_dur / n_imgs if n_imgs > 0 else 5.0
 
-    logger.info(f"Tạo Shorts từ {len(image_paths)} ảnh | {total_dur:.1f}s")
+    logger.info(f"Dựng Shorts AI: {n_imgs} ảnh | {total_dur:.1f}s")
 
+    # Xử lý Subtitles: Nhóm 3-4 từ
     subs = []
     if vtt_path and os.path.exists(vtt_path):
         from modules.video_maker import parse_vtt, group_subs
         raw_subs = parse_vtt(str(vtt_path))
-        subs = group_subs(raw_subs, max_words=4) # Shorts màn ngang hẹp, chỉ 4 từ
-        logger.info(f"Đã nạp {len(subs)} câu dòng phụ đề.")
+        subs = group_subs(raw_subs, max_words=4) 
+        logger.info(f"Đã nạp {len(subs)} cụm phụ đề.")
 
-    # Pre-load và resize tất cả ảnh
-    portrait_imgs = []
+    # Pre-load và scale ảnh (Portrait)
+    # Chúng ta lấy ảnh to hơn 1 chút để có không gian zoom
+    scaled_imgs = []
     for ip in image_paths:
         try:
             img = Image.open(ip).convert("RGB")
-            # Crop center → portrait
-            targ_ratio = W / H
-            src_ratio  = img.width / img.height
-            if src_ratio > targ_ratio:
-                new_w = int(img.height * targ_ratio)
-                off   = (img.width - new_w) // 2
-                img   = img.crop((off, 0, off + new_w, img.height))
+            # Crop center → portrait 
+            target_ratio = W / H
+            src_ratio = img.width / img.height
+            if src_ratio > target_ratio:
+                new_w = int(img.height * target_ratio)
+                off = (img.width - new_w) // 2
+                img = img.crop((off, 0, off + new_w, img.height))
             else:
-                new_h = int(img.width / targ_ratio)
-                off   = (img.height - new_h) // 2
-                img   = img.crop((0, off, img.width, off + new_h))
-            img = img.resize((W, H), Image.LANCZOS)
-            portrait_imgs.append(np.array(img))
+                new_h = int(img.width / target_ratio)
+                off = (img.height - new_h) // 2
+                img = img.crop((0, off, img.width, off + new_h))
+            
+            # Phóng to 20% để lấy chỗ cho Ken Burns
+            img = img.resize((int(W * 1.2), int(H * 1.2)), Image.LANCZOS)
+            scaled_imgs.append(np.array(img))
         except Exception as e:
-            logger.warning(f"Lỗi load ảnh Shorts {ip}: {e}")
+            logger.warning(f"Lỗi load ảnh {ip}: {e}")
 
-    if not portrait_imgs:
-        raise RuntimeError("Không có ảnh nào để tạo Shorts")
+    if not scaled_imgs:
+        raise RuntimeError("Không có ảnh hợp lệ")
 
-    n_imgs = len(portrait_imgs)
+    directions = ["in", "out"] * (len(scaled_imgs) // 2 + 1)
 
-    def make_frame(t):
-        idx   = min(int(t / img_dur), n_imgs - 1)
-        frame = portrait_imgs[idx].copy()
-        pil   = Image.fromarray(frame)
-
-        draw = ImageDraw.Draw(pil)
-        # Gradient overlay phía dưới
-        for y in range(int(H * 0.7), H):
-            ratio = (y - H * 0.7) / (H * 0.3)
-            a = int(160 * ratio)
-            draw.line([(0, y), (W, y)], fill=(0, 0, 0, a))
-
-        # Channel label
+    def _add_phrase_subtitle(draw, text, W, H):
+        """Vẽ phụ đề 3-4 từ phong cách Shorts ở trung tâm cực lớn."""
         try:
-            font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 36)
-        except Exception:
+            # Ưu tiên font Bold
+            font_path = "C:/Windows/Fonts/arialbd.ttf" if os.name == 'nt' else None
+            font = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
+        except:
             font = ImageFont.load_default()
 
-        draw.text((W//2 - 150, H - 180), f"| {channel_name}", font=font, fill=(255, 220, 80))
-        draw.text((W//2 - 100, H - 100), "👍 Follow for more!", font=font, fill=(200, 200, 200))
+        # Shadow / Outline
+        text = text.upper()
+        if hasattr(draw, "textbbox"):
+            bbox = draw.textbbox((0, 0), text, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+        else:
+            tw, th = draw.textsize(text, font=font)
+        
+        x = (W - tw) // 2
+        y = (H - th) // 2 - 100 # Hơi cao hơn tâm một chút
 
-        # Tích hợp Subtitle 
-        frame_arr = np.array(pil)
+        # Stroke đen dày
+        sw = 6
+        for dx in range(-sw, sw+1):
+            for dy in range(-sw, sw+1):
+                draw.text((x+dx, y+dy), text, font=font, fill=(0,0,0))
+        
+        # Text chính màu Vàng Chanh nổi bật
+        draw.text((x, y), text, font=font, fill=(255, 255, 0))
+
+    def make_frame(t):
+        idx = min(int(t / img_dur), len(scaled_imgs) - 1)
+        arr = scaled_imgs[idx]
+        dir_val = directions[idx]
+
+        # Ken Burns effect logic
+        progress = (t % img_dur) / img_dur
+        if dir_val == "out": progress = 1.0 - progress
+        
+        zoom = 1.0 + 0.15 * progress # Zoom 15%
+        
+        full_h, full_w = arr.shape[:2]
+        crop_w = int(full_w / zoom)
+        crop_h = int(full_h / zoom)
+        
+        # Center crop
+        left = (full_w - crop_w) // 2
+        top  = (full_h - crop_h) // 2
+        
+        crop = arr[top:top+crop_h, left:left+crop_w]
+        pil  = Image.fromarray(crop).resize((W, H), Image.LANCZOS)
+        
+        # Gradient dark overlay ở giữa để text nổi bật
+        draw = ImageDraw.Draw(pil)
+        
+        # Subtitle check
         if subs:
-            from modules.video_maker import _add_subtitle_to_frame
             for start, end, text in subs:
                 if start <= t <= end:
-                    frame_arr = _add_subtitle_to_frame(frame_arr, text, W, H, font_size=55, is_shorts=True)
+                    _add_phrase_subtitle(draw, text, W, H)
                     break
-        return frame_arr
+                    
+        return np.array(pil)
 
     clip = VideoClip(make_frame, duration=total_dur).with_fps(fps)
     clip = clip.with_audio(audio_clip.subclipped(0, total_dur))
 
-    clip = clip.with_effects([vfx.FadeIn(0.3), vfx.FadeOut(0.3)])
-
+    # Xuất file libx264 chất lượng cao
     clip.write_videofile(
         str(output_path),
         codec         = "libx264",
         audio_codec   = "aac",
-        bitrate       = "4000k",
-        audio_bitrate = "128k",
-        preset        = "fast",
+        bitrate       = "6000k",
+        preset        = "medium",
         logger        = None
     )
 
     clip.close()
     audio_clip.close()
-
-    size_mb = output_path.stat().st_size / 1024 / 1024
-    logger.info(f"✅ Shorts (từ ảnh): {output_path.name} ({size_mb:.1f} MB)")
     return str(output_path)
+

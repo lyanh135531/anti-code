@@ -23,12 +23,7 @@ def _configure_gemini():
 def generate_video_script(topic_config: dict) -> dict:
     """
     Tạo nội dung script cho video dài (7-10 phút).
-    
-    Args:
-        topic_config: Dict từ RELIGION_TOPICS trong config.py
-        
-    Returns:
-        Dict chứa: script, title, description, tags, hook
+    Bao gồm các gợi ý cảnh quay [SCENE: ...] cho AI tạo ảnh.
     """
     topic   = topic_config["topic"]
     religion = topic_config["religion"]
@@ -40,6 +35,7 @@ def generate_video_script(topic_config: dict) -> dict:
     model = _configure_gemini()
 
     prompt = f"""You are an expert YouTube content creator specializing in world religions and spirituality.
+Target Audience: Global (International). Language: English.
 
 Create a complete, engaging YouTube video script on the following topic:
 
@@ -49,25 +45,21 @@ ANGLE: {angle}
 KEYWORDS TO NATURALLY INCLUDE: {', '.join(keywords)}
 
 SCRIPT REQUIREMENTS:
-- Total length: 900-1100 words (for a 7-9 minute video when read at normal pace)
-- Language: Clear, engaging English for an international audience
-- Tone: Respectful, educational, and inspiring — NOT preachy
-- Structure:
-  1. HOOK (30-40 words): Start with a powerful question or surprising fact that grabs attention instantly
-  2. INTRO (60-80 words): Brief overview of what viewers will learn — include the phrase "Stay until the end because..."
-  3. MAIN CONTENT (750-880 words): 4-5 sections with clear headings, each with stories/examples/facts
-  4. OUTRO (80-100 words): Summarize key takeaways, ask viewers to comment their thoughts, remind them to Subscribe and Like
+- Total length: 900-1100 words (for a 7-9 minute video)
+- Tone: Respectful, educational, and inspiring.
+- Visuals: For EVERY major paragraph, include a [SCENE: ...] tag describing a high-quality, cinematic visual prompt for an AI image generator (Imagen).
 
-IMPORTANT RULES:
-- Each section should feel like a natural conversation, not a textbook
-- Include at least 2 specific historical facts or stories
-- Include 1-2 surprising or lesser-known facts
-- End sentences with natural spoken rhythm (short sentences are good)
-- Do NOT use bullet points in the script — write in flowing paragraphs as if speaking
-- Add [PAUSE] markers where the narrator should pause for effect
-- Format each section with the heading in ALL CAPS like: [SECTION: Title Here]
+Structure:
+  1. HOOK (30-40 words): Start with a powerful question or surprising fact.
+  2. INTRO (60-80 words): Brief overview.
+  3. MAIN CONTENT: 4-5 sections with clear headings [SECTION: Title].
+  4. OUTRO: Summary and CTA (Subscribe/Like).
 
-Now write the complete script:"""
+Format:
+[SCENE: Detailed cinematic prompt for AI image generator]
+"Spoken script text here..."
+
+Now write the complete script in English:"""
 
     for attempt in range(3):
         try:
@@ -75,7 +67,7 @@ Now write the complete script:"""
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.85,
-                    max_output_tokens=2048,
+                    max_output_tokens=3000,
                 )
             )
             script_text = response.text
@@ -88,17 +80,13 @@ Now write the complete script:"""
                 "religion": religion,
                 "keywords": keywords,
                 "script":   script_text,
-                "word_count": len(script_text.split()),
+                "word_count": word_count,
             }
         except Exception as e:
             err_str = str(e)
             logger.warning(f"Attempt {attempt+1}/3 thất bại: {err_str}")
             if attempt < 2:
-                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
-                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
-                    time.sleep(45)
-                else:
-                    time.sleep(5)
+                time.sleep(5)
 
     raise RuntimeError("Không thể tạo script sau 3 lần thử")
 
@@ -106,13 +94,7 @@ Now write the complete script:"""
 def generate_shorts_script(topic_config: dict, full_script: str) -> str:
     """
     Tạo script ngắn 55-58 giây cho YouTube Shorts.
-    
-    Args:
-        topic_config: Thông tin chủ đề
-        full_script:  Script đầy đủ đã tạo trước đó
-        
-    Returns:
-        Script ngắn dưới 150 từ
+    Yêu cầu chính xác 6-10 visual prompts [SCENE: ...].
     """
     hook   = topic_config.get("shorts_hook", topic_config["topic"])
     topic  = topic_config["topic"]
@@ -121,24 +103,30 @@ def generate_shorts_script(topic_config: dict, full_script: str) -> str:
 
     model = _configure_gemini()
 
-    prompt = f"""Create an ultra-engaging YouTube Shorts script (55-58 seconds when read at normal pace = 120-140 words).
-
+    prompt = f"""Create an ultra-engaging YouTube Shorts script in English (55-58 seconds).
 TOPIC: {topic}
 HOOK IDEA: {hook}
 
 CONTEXT FROM FULL VIDEO:
-{full_script[:800]}
+{full_script[:1000]}
 
 SHORTS SCRIPT REQUIREMENTS:
-- Total: EXACTLY 120-140 words
-- Start with the HOOK (5-7 words) — make it shocking/intriguing
-- Then deliver 3 fast punchy facts or insights from the topic
-- End with "Follow for more sacred wisdom!" or similar CTA
-- Every sentence must be SHORT (max 12 words each)
-- Read in a fast, energetic pace
-- Add [PAUSE 0.5s] for dramatic effect
+- Total spoken words: 120-140 words.
+- Visual Scenes: You MUST include EXACTLY 8 visual scene prompts using the format [SCENE: Description].
+- Prompts should be cinematic, 8k, photorealistic, and match the spoken text.
+- Captions style: The spoken text should be divided into short, punchy phrases.
 
-Write ONLY the script text, no instructions or meta-comments:"""
+Format:
+[SCENE: Visual prompt for Imagen]
+"Spoken phrase 1..."
+"Spoken phrase 2..."
+
+[SCENE: Visual prompt 2]
+"Spoken phrase 3..."
+
+... continue until you have 8 scenes.
+
+Write ONLY the script in English:"""
 
     for attempt in range(3):
         try:
@@ -146,28 +134,26 @@ Write ONLY the script text, no instructions or meta-comments:"""
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.9,
-                    max_output_tokens=400,
+                    max_output_tokens=1000,
                 )
             )
             shorts_script = response.text.strip()
-            word_count = len(shorts_script.split())
-            if word_count < 50:
-                raise ValueError(f"Shorts script quá ngắn ({word_count} từ).")
-            logger.info(f"Shorts script: {word_count} từ")
+            # Kiểm tra số lượng [SCENE:]
+            scene_count = len(re.findall(r'\[SCENE:', shorts_script))
+            if scene_count < 4:
+                raise ValueError(f"Số lượng cảnh quá ít ({scene_count}).")
+            
+            logger.info(f"Shorts script created with {scene_count} scenes.")
             return shorts_script
         except Exception as e:
             err_str = str(e)
             logger.warning(f"Shorts attempt {attempt+1}/3 thất bại: {err_str}")
             if attempt < 2:
-                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
-                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
-                    time.sleep(45)
-                else:
-                    time.sleep(5)
+                time.sleep(5)
 
-    # Fallback: Dùng 140 từ đầu của full script
-    words = full_script.split()[:140]
-    return " ".join(words)
+    # Fallback basic format if AI fails to format correctly
+    return f"[SCENE: Cinematic portrait of {topic}]\n{full_script[:140]}"
+
 
 
 def save_script(script_text: str, filename: str, output_dir) -> str:
