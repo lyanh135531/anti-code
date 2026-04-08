@@ -60,12 +60,17 @@ SHORTS_DURATION = 58     # Giây (giữ dưới 60s để đủ điều kiện S
 # ============================================================
 # CÀI ĐẶT GIỌNG ĐỌC (Edge TTS - Microsoft, miễn phí)
 # ============================================================
-TTS_VOICE = "en-US-AriaNeural"
-# Gợi ý giọng khác:
-# "en-US-GuyNeural"        - Giọng nam Mỹ
+TTS_VOICE = "en-US-AndrewMultilingualNeural"
+# Gợi ý giọng Nam (Male) tiếng Anh:
+# "en-US-GuyNeural"         - Giọng nam Mỹ (Rất phổ biến, trầm ấm)
+# "en-US-BrianNeural"       - Giọng nam Mỹ (Rõ ràng, chuyên nghiệp)
+# "en-US-EricNeural"        - Giọng nam Mỹ (Trẻ trung)
+# "en-GB-RyanNeural"        - Giọng nam Anh (Lịch lãm)
+# "en-US-AndrewMultilingualNeural" - Giọng nam đa ngôn ngữ (Tốt)
+# Gợi ý giọng Nữ (Female):
+# "en-US-AriaNeural"       - Giọng nữ Mỹ (Mặc định)
 # "en-GB-SoniaNeural"      - Giọng nữ Anh
 # "en-AU-NatashaNeural"    - Giọng nữ Úc
-# "en-IN-NeerjaNeural"     - Giọng nữ Ấn Độ (phù hợp topic Eastern)
 TTS_RATE   = "-5%"    # Chậm hơn 5% cho dễ nghe
 TTS_PITCH  = "+0Hz"
 
