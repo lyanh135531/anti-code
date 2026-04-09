@@ -17,10 +17,13 @@ load_dotenv()
 # ============================================================
 # API KEYS - Điền vào đây hoặc dùng file .env
 # ============================================================
-GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY",    "YOUR_GEMINI_API_KEY")
-PEXELS_API_KEY    = os.getenv("PEXELS_API_KEY",    "YOUR_PEXELS_API_KEY")
-PIXABAY_API_KEY   = os.getenv("PIXABAY_API_KEY",   "YOUR_PIXABAY_API_KEY")
+# KEY DUY NHẤT CẦN THIẾT — Pollinations (text + image)
 POLLINATIONS_API_KEY = os.getenv("POLLINATIONS_API_KEY", "YOUR_POLLINATIONS_API_KEY")
+
+# Optional (không dùng trong pipeline hiện tại)
+GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY",   "")
+PEXELS_API_KEY   = os.getenv("PEXELS_API_KEY",   "")
+PIXABAY_API_KEY  = os.getenv("PIXABAY_API_KEY",  "")
 
 # ============================================================
 # ĐƯỜNG DẪN THƯ MỤC
@@ -108,21 +111,18 @@ RELIGION_COLORS = {
 }
 
 # ============================================================
-# AI MODELS (google-genai)
+# AI TEXT MODELS (Pollinations.ai) — MIỄN PHÍ, không quota
 # ============================================================
-GEMINI_MAIN_MODEL = "gemini-3-flash-preview"
-GEMINI_FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",   # Cực kỳ ổn định, quota cao nhất
-]
+# Thứ tự ưu tiên trong pollinations_text.py:
+#   openai → mistral → deepseek → claude-fast → openai-fast
 
 # ============================================================
-# AI IMAGE MODELS (Pollinations.ai)
+# AI IMAGE MODELS (Pollinations.ai) — tốn Pollen
 # ============================================================
-AI_IMAGE_MODEL = "flux-schnell"  
-# Các model Pollinations hỗ trợ: "flux", "flux-schnell", "flux-realism", "flux-3d", etc.
+AI_IMAGE_MODEL = "flux-schnell"
+# Các model: "flux", "flux-schnell", "zimage", "flux-realism"
+
 # ============================================================
-# CHỦ ĐỀ VIDEO (Autonomous AI generation)
+# CHỦ ĐỀ VIDEO
 # ============================================================
 TARGET_RELIGION = "Christianity"
