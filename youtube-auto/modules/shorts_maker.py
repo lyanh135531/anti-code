@@ -237,7 +237,7 @@ def create_shorts_from_images(
 
         try:
             font_path = "C:/Windows/Fonts/arialbd.ttf" if os.name == 'nt' else None
-            font = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
+            font = ImageFont.truetype(font_path, 72) if font_path else ImageFont.load_default()
         except Exception:
             font = ImageFont.load_default()
 
