@@ -1,7 +1,8 @@
 """
 ==========================================================
-  MODULE: SCRIPT GENERATOR (NEW SDK)
-  Dùng Google Gemini API (google-genai) để tạo nội dung video
+  MODULE: SCRIPT GENERATOR — SHORTS ONLY
+  Tạo script YouTube Shorts 45-55 giây về Chúa Jesus.
+  Mỗi script gồm ĐÚNG 9 cảnh [SCENE: ...] với ảnh Kinh Thánh.
 ==========================================================
 """
 
@@ -14,170 +15,157 @@ from config import GEMINI_API_KEY, GEMINI_MAIN_MODEL, GEMINI_FALLBACK_MODELS
 
 logger = logging.getLogger(__name__)
 
+SHORTS_SCENES_COUNT = 9   # 9 ảnh = 9 cảnh
+SHORTS_WORDS_MIN    = 100  # ~45s at ~130 WPM
+SHORTS_WORDS_MAX    = 130  # ~58s
+
 
 def _get_client():
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
-def generate_video_script(topic_config: dict) -> dict:
+def generate_shorts_script(topic_config: dict) -> dict:
     """
-    Tạo nội dung script cho video dài (7-10 phút) sử dụng SDK mới.
-    """
-    topic   = topic_config["topic"]
-    religion = topic_config["religion"]
-    angle   = topic_config.get("script_angle", "")
-    keywords = topic_config.get("keywords", [])
+    Tạo script YouTube Shorts hoàn chỉnh về Chúa Jesus.
+    - Thời lượng: 45-55 giây
+    - Số cảnh: đúng 9 [SCENE: ...] với ảnh Biblical/Christian
+    - Không phụ thuộc vào long-form script nào.
 
-    logger.info(f"Đang tạo script cho topic: {topic}")
+    Returns:
+        {
+            "topic": str,
+            "script": str,        # Full script with [SCENE: ...] markers
+            "clean_script": str,  # Script without markers (for TTS)
+            "scenes": list[dict], # List of {visual_prompt, text}
+            "word_count": int,
+            "bible_reference": str,
+        }
+    """
+    topic           = topic_config["topic"]
+    hook            = topic_config.get("shorts_hook", topic)
+    visual_theme    = topic_config.get("visual_theme", "Ancient Jerusalem with divine golden light")
+    bible_ref       = topic_config.get("bible_reference", "John 3:16")
+    keywords        = topic_config.get("keywords", ["jesus", "bible", "faith"])
+
+    logger.info(f"Đang tạo script Shorts: {topic}")
 
     client = _get_client()
-    
-    # Danh sách các model để thử (Primary + Fallbacks)
     model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
-    
-    prompt = f"""You are an expert YouTube content creator specializing in world religions and spirituality.
-Target Audience: Global (International). Language: English.
 
-Create a complete, engaging YouTube video script on the following topic:
+    prompt = f"""You are a Christian YouTube Shorts scriptwriter. Write a powerful, emotional 45-55 second script about Jesus Christ for the channel "Spiritus".
 
 TOPIC: {topic}
-RELIGION FOCUS: {religion}
-ANGLE: {angle}
-KEYWORDS TO NATURALLY INCLUDE: {', '.join(keywords)}
+OPENING HOOK: {hook}
+BIBLE VERSE TO FEATURE: {bible_ref}
+VISUAL STYLE: {visual_theme}
+KEYWORDS: {', '.join(keywords)}
 
-SCRIPT REQUIREMENTS:
-- Total length: 900-1100 words (for a 7-9 minute video)
-- Tone: Respectful, educational, and inspiring.
-- Visuals: For EVERY major paragraph, include a [SCENE: ...] tag describing a high-quality, cinematic visual prompt for an AI image generator (Imagen).
+STRICT RULES:
+1. Write EXACTLY {SHORTS_SCENES_COUNT} scenes using this format: [SCENE: description]
+2. Total spoken words: {SHORTS_WORDS_MIN}–{SHORTS_WORDS_MAX} words (this gives 45–55 seconds at normal pace)
+3. Each [SCENE: ...] must describe a SPECIFIC Biblical or Christian visual:
+   - Examples: "Jesus healing a blind man in ancient Jerusalem, golden sunlight", "Open Bible with John 3:16 glowing, ethereal light", "The cross on a hill at sunset, dramatic clouds"
+   - NEVER generic: "a person meditating", "nature landscape", "peaceful scenery"
+4. The spoken text under each scene must be short punchy phrases (2–3 lines max per scene)
+5. Open with the hook. Close with a call-to-faith (e.g. "Subscribe for daily Scripture")
+6. Emotional tone: awe-inspiring, warm, faith-building — never preachy or boring
 
-Structure:
-  1. HOOK (30-40 words): Start with a powerful question or surprising fact.
-  2. INTRO (60-80 words): Brief overview.
-  3. MAIN CONTENT: 4-5 sections with clear headings [SECTION: Title].
-  4. OUTRO: Summary and CTA (Subscribe/Like).
+FORMAT (repeat exactly {SHORTS_SCENES_COUNT} times):
+[SCENE: specific Biblical/Christian visual prompt]
+"Spoken line 1"
+"Spoken line 2"
 
-Format:
-[SCENE: Detailed cinematic prompt for AI image generator]
-"Spoken script text here..."
-
-Now write the complete script in English:"""
+Write the complete script now:"""
 
     last_error = None
     for model_id in model_list:
         logger.info(f"Sử dụng model: {model_id}")
-        
-        for attempt in range(2): # 2 attempts per model
+        for attempt in range(2):
             try:
                 response = client.models.generate_content(
                     model=model_id,
                     contents=prompt,
                     config=types.GenerateContentConfig(
-                        temperature=0.8,
-                        max_output_tokens=4000,
+                        temperature=0.85,
+                        max_output_tokens=2000,
                     )
                 )
-                
+
                 script_text = response.text
                 if not script_text:
-                    raise ValueError("Nhận được phản hồi rỗng từ AI.")
-                    
-                word_count = len(script_text.split())
-                if word_count < 100:
-                    raise ValueError(f"Script tạo ra quá ngắn ({word_count} từ).")
-                    
-                logger.info(f"Script tạo thành công: {word_count} từ")
+                    raise ValueError("Phản hồi rỗng từ API.")
+
+                # Validate scene count
+                scene_count = len(re.findall(r'\[SCENE:', script_text))
+                if scene_count < 6:
+                    raise ValueError(f"Quá ít cảnh: {scene_count}/{SHORTS_SCENES_COUNT}")
+                if scene_count > 12:
+                    raise ValueError(f"Quá nhiều cảnh: {scene_count}")
+
+                # Build clean script (TTS)
+                clean_script = re.sub(r'\[SCENE:.*?\]', '', script_text)
+                clean_script = re.sub(r'^\s*"(.*)"\s*$', r'\1', clean_script, flags=re.MULTILINE)
+                clean_script = re.sub(r'\[SECTION:.*?\]', '', clean_script)
+                clean_script = '\n'.join(
+                    line.strip().strip('"') for line in clean_script.splitlines() if line.strip()
+                )
+
+                word_count = len(clean_script.split())
+                if word_count < 60:
+                    raise ValueError(f"Script quá ngắn: {word_count} từ")
+
+                # Parse scenes
+                scenes = _parse_scenes(script_text)
+
+                logger.info(f"✅ Script OK ({model_id}): {scene_count} cảnh, {word_count} từ")
                 return {
-                    "topic":    topic,
-                    "religion": religion,
-                    "keywords": keywords,
-                    "script":   script_text,
-                    "word_count": word_count,
+                    "topic":          topic,
+                    "script":         script_text,
+                    "clean_script":   clean_script,
+                    "scenes":         scenes,
+                    "word_count":     word_count,
+                    "bible_reference": bible_ref,
                 }
+
             except Exception as e:
                 last_error = e
                 err_str = str(e).lower()
-                logger.warning(f"Lỗi với model {model_id} (lần {attempt+1}): {err_str}")
-                
+                logger.warning(f"Lỗi {model_id} (lần {attempt+1}): {err_str[:200]}")
+
                 if "429" in err_str or "quota" in err_str:
-                    wait_time = 30
-                    logger.info(f"Hết quota, chờ {wait_time}s...")
-                    time.sleep(wait_time)
+                    logger.info(f"Hết quota {model_id} → chuyển model...")
+                    break
                 elif "503" in err_str or "unavailable" in err_str:
-                    wait_time = 10
-                    logger.info(f"Dịch vụ quá tải, chờ {wait_time}s...")
-                    time.sleep(wait_time)
+                    time.sleep(10)
                 else:
                     time.sleep(5)
-        
-        logger.info(f"Thử model tiếp theo...")
 
-    raise RuntimeError(f"Không thể tạo script sau khi thử tất cả các model. Lỗi cuối: {last_error}")
+        logger.info("Thử model tiếp theo...")
+
+    raise RuntimeError(f"Không thể tạo script sau khi thử tất cả model. Lỗi: {last_error}")
 
 
-def generate_shorts_script(topic_config: dict, full_script: str) -> str:
+def _parse_scenes(script_text: str) -> list[dict]:
     """
-    Tạo script ngắn 55-58 giây cho YouTube Shorts.
+    Tách [SCENE: ...] và phần text nói tương ứng.
+    Trả về list [{'visual_prompt': '...', 'text': '...'}]
     """
-    hook   = topic_config.get("shorts_hook", topic_config["topic"])
-    topic  = topic_config["topic"]
+    scenes = []
+    pattern = r'\[SCENE:\s*(.*?)\](.*?)(?=\[SCENE:|$)'
+    matches = re.findall(pattern, script_text, re.DOTALL)
 
-    logger.info("Đang tạo script cho Shorts...")
+    for prompt, text in matches:
+        clean_text = re.sub(r'\[SECTION:.*?\]', '', text)
+        clean_text = '\n'.join(
+            line.strip().strip('"') for line in clean_text.splitlines() if line.strip()
+        )
+        if prompt.strip():
+            scenes.append({
+                "visual_prompt": prompt.strip(),
+                "text": clean_text.strip(),
+            })
 
-    client = _get_client()
-    model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
-
-    prompt = f"""Create an ultra-engaging YouTube Shorts script in English (55-58 seconds).
-TOPIC: {topic}
-HOOK IDEA: {hook}
-
-CONTEXT FROM FULL VIDEO:
-{full_script[:1500]}
-
-SHORTS SCRIPT REQUIREMENTS:
-- Total spoken words: 120-140 words.
-- Visual Scenes: You MUST include EXACTLY 8 visual scene prompts using the format [SCENE: Description].
-- Prompts should be cinematic, 8k, photorealistic, and match the spoken text.
-- Captions style: The spoken text should be divided into short, punchy phrases.
-
-Format:
-[SCENE: Visual prompt for Imagen]
-"Spoken phrase 1..."
-"Spoken phrase 2..."
-
-[SCENE: Visual prompt 2]
-"Spoken phrase 3..."
-
-... continue until you have 8 scenes.
-
-Write ONLY the script in English:"""
-
-    last_error = None
-    for model_id in model_list:
-        try:
-            response = client.models.generate_content(
-                model=model_id,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.9,
-                    max_output_tokens=1500,
-                )
-            )
-            
-            shorts_script = response.text.strip()
-            # Kiểm tra sơ bộ định dạng
-            scene_count = len(re.findall(r'\[SCENE:', shorts_script))
-            if scene_count < 3:
-                raise ValueError(f"Định dạng Shorts script không chuẩn (chỉ có {scene_count} cảnh).")
-                
-            logger.info(f"Shorts script created with {scene_count} scenes.")
-            return shorts_script
-        except Exception as e:
-            last_error = e
-            logger.warning(f"Lỗi tạo Shorts với {model_id}: {e}")
-            continue
-
-    # Fallback basic format if AI fails completely
-    return f"[SCENE: Cinematic portrait of {topic}]\n{full_script[:140]}"
+    return scenes
 
 
 def save_script(script_text: str, filename: str, output_dir) -> str:

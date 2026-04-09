@@ -42,21 +42,19 @@ for d in [
     d.mkdir(parents=True, exist_ok=True)
 
 # ============================================================
-# CÀI ĐẶT VIDEO CHÍNH (16:9)
+# CÀI ĐẶT YOUTUBE SHORTS (9:16) — SẢN PHẨM DUY NHẤT
 # ============================================================
-VIDEO_WIDTH    = 1920
-VIDEO_HEIGHT   = 1080
-FPS            = 24
-IMAGE_DURATION = 6       # Giây mỗi ảnh (tăng lên nếu ảnh ít)
-FADE_DURATION  = 0.8     # Giây fade chuyển cảnh
-MAX_IMAGES     = 9       # 9 ảnh chính + 1 ảnh thumbnail = đúng 10 ảnh (giới hạn Pollen)
+SHORTS_WIDTH      = 1080
+SHORTS_HEIGHT     = 1920
+SHORTS_FPS        = 24
+SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video (Pollinations limit = 10, giữ 1 dự phòng)
+FADE_DURATION     = 0.5      # Giây fade chuyển cảnh
 
-# ============================================================
-# CÀI ĐẶT YOUTUBE SHORTS (9:16)
-# ============================================================
-SHORTS_WIDTH   = 1080
-SHORTS_HEIGHT  = 1920
-SHORTS_DURATION = 58     # Giây (giữ dưới 60s để đủ điều kiện Shorts)
+# Giữ lại các alias để không bị lỗi import cũ trong các module khác
+FPS          = SHORTS_FPS
+MAX_IMAGES   = SHORTS_MAX_IMAGES
+VIDEO_WIDTH  = SHORTS_WIDTH
+VIDEO_HEIGHT = SHORTS_HEIGHT
 
 # ============================================================
 # CÀI ĐẶT GIỌNG ĐỌC (Edge TTS - Microsoft, miễn phí)

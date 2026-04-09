@@ -218,35 +218,78 @@ def create_shorts_from_images(
 
     directions = ["in", "out"] * (len(scaled_imgs) // 2 + 1)
 
-    def _add_phrase_subtitle(draw, text, W, H):
-        """Vẽ phụ đề 3-4 từ phong cách Shorts ở trung tâm cực lớn."""
+    def _add_phrase_subtitle(pil_img, text, W, H):
+        """
+        Vẽ phụ đề Shorts chuẩn:
+        - Vị trí: ~75% chiều cao (phía dưới, tránh UI YouTube)
+        - Font: Bold 90px, chữ HOA
+        - Nền: Box tối mờ (semi-transparent) để luôn dễ đọc
+        - Màu chữ: Trắng với viền đen
+        """
+        import textwrap
+        from PIL import ImageFont, ImageDraw, Image as PILImage
+
+        # Tách dòng nếu text quá dài (tối đa 18 ký tự/dòng cho portrait)
+        text = text.upper()
+        lines = textwrap.wrap(text, width=18)
+        if not lines:
+            return pil_img
+
         try:
-            # Ưu tiên font Bold
             font_path = "C:/Windows/Fonts/arialbd.ttf" if os.name == 'nt' else None
             font = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
-        except:
+        except Exception:
             font = ImageFont.load_default()
 
-        # Shadow / Outline
-        text = text.upper()
-        if hasattr(draw, "textbbox"):
-            bbox = draw.textbbox((0, 0), text, font=font)
-            tw = bbox[2] - bbox[0]
-            th = bbox[3] - bbox[1]
-        else:
-            tw, th = draw.textsize(text, font=font)
-        
-        x = (W - tw) // 2
-        y = (H - th) // 2 - 100 # Hơi cao hơn tâm một chút
+        draw = ImageDraw.Draw(pil_img)
 
-        # Stroke đen dày
-        sw = 6
-        for dx in range(-sw, sw+1):
-            for dy in range(-sw, sw+1):
-                draw.text((x+dx, y+dy), text, font=font, fill=(0,0,0))
-        
-        # Text chính màu Vàng Chanh nổi bật
-        draw.text((x, y), text, font=font, fill=(255, 255, 0))
+        # Đo toàn bộ block text
+        line_bboxes = []
+        for ln in lines:
+            bb = draw.textbbox((0, 0), ln, font=font)
+            line_bboxes.append((bb[2] - bb[0], bb[3] - bb[1]))
+
+        line_h = line_bboxes[0][1] if line_bboxes else 80
+        line_gap = 12
+        total_text_h = len(lines) * line_h + (len(lines) - 1) * line_gap
+        max_text_w = max(w for w, _ in line_bboxes)
+
+        # Vị trí: giữa theo chiều ngang, 75% theo chiều dọc
+        pad_x, pad_y = 40, 24
+        box_x = (W - max_text_w) // 2 - pad_x
+        box_y = int(H * 0.74) - pad_y
+        box_w = max_text_w + pad_x * 2
+        box_h = total_text_h + pad_y * 2
+
+        # Vẽ background pill box (semi-transparent đen)
+        overlay = PILImage.new("RGBA", pil_img.size, (0, 0, 0, 0))
+        ov_draw = ImageDraw.Draw(overlay)
+        r = 24  # border radius
+        ov_draw.rounded_rectangle(
+            [box_x, box_y, box_x + box_w, box_y + box_h],
+            radius=r,
+            fill=(0, 0, 0, 175)
+        )
+        pil_img = PILImage.alpha_composite(pil_img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(pil_img)
+
+        # Vẽ từng dòng text
+        y_cursor = box_y + pad_y
+        for ln, (lw, lh) in zip(lines, line_bboxes):
+            x = (W - lw) // 2
+
+            # Stroke đen
+            sw = 4
+            for dx in range(-sw, sw + 1):
+                for dy in range(-sw, sw + 1):
+                    if dx * dx + dy * dy <= sw * sw:
+                        draw.text((x + dx, y_cursor + dy), ln, font=font, fill=(0, 0, 0))
+
+            # Chữ trắng chính
+            draw.text((x, y_cursor), ln, font=font, fill=(255, 255, 255))
+            y_cursor += lh + line_gap
+
+        return pil_img
 
     def make_frame(t):
         idx = min(int(t / img_dur), len(scaled_imgs) - 1)
@@ -270,14 +313,11 @@ def create_shorts_from_images(
         crop = arr[top:top+crop_h, left:left+crop_w]
         pil  = Image.fromarray(crop).resize((W, H), Image.LANCZOS)
         
-        # Gradient dark overlay ở giữa để text nổi bật
-        draw = ImageDraw.Draw(pil)
-        
-        # Subtitle check
+        # Subtitle — trả về pil đã được vẽ subtitle
         if subs:
             for start, end, text in subs:
                 if start <= t <= end:
-                    _add_phrase_subtitle(draw, text, W, H)
+                    pil = _add_phrase_subtitle(pil, text, W, H)
                     break
                     
         return np.array(pil)
