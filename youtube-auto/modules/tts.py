@@ -181,7 +181,7 @@ async def _generate_audio_async(text: str, output_path: str, voice: str, rate: s
 def text_to_speech(
     script: str,
     output_path: str | Path,
-    voice: str   = "en-US-GuyNeural",
+    voice: str   = "en-US-BrianNeural",
     rate: str    = "-5%",
     pitch: str   = "+0Hz"
 ) -> str:
@@ -202,13 +202,13 @@ def text_to_speech(
     # Nếu là Aria (Standard Female), fallback về Sonia (GB-Female)
     fallback_voices = [voice]
     if "Andrew" in voice:
-        fallback_voices.append("en-US-GuyNeural")
+        fallback_voices.append("en-US-BrianNeural")
     elif "Aria" in voice:
         fallback_voices.append("en-GB-SoniaNeural")
     
     # Thêm một giọng cực kỳ ổn định cuối cùng
-    if "en-US-GuyNeural" not in fallback_voices:
-        fallback_voices.append("en-US-GuyNeural")
+    if "en-US-BrianNeural" not in fallback_voices:
+        fallback_voices.append("en-US-BrianNeural")
 
     success = False
     last_error = None
