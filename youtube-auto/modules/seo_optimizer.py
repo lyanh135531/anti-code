@@ -11,7 +11,7 @@ import time
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, BASE_TAGS, CHANNEL_NAME
+from config import GEMINI_API_KEY, BASE_TAGS, CHANNEL_NAME, GEMINI_MAIN_MODEL, GEMINI_FALLBACK_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,8 @@ def generate_seo_metadata(
 
     client = _get_client()
 
-    # Model cho SEO không cần Imagen, dùng Flash 2.0 là tốt nhất cho tốc độ và JSON
-    # Nếu gemini-2.0-flash không có sẵn, dùng gemini-1.5-flash
-    model_id = "gemini-2.0-flash" 
+    # Danh sách các model để thử
+    model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
 
     prompt = f"""You are a YouTube SEO expert specializing in religious and spiritual content.
 Generate comprehensive SEO metadata for a YouTube video.
@@ -64,54 +63,54 @@ INSTRUCTIONS:
 - Shorts title must end with #Shorts.
 """
 
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model=model_id,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                    response_json_schema=SEOMetadata.model_json_schema(),
-                    temperature=0.7,
+    last_error = None
+    for model_id in model_list:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type='application/json',
+                        response_json_schema=SEOMetadata.model_json_schema(),
+                        temperature=0.7,
+                    )
                 )
-            )
 
-            # Với SDK này và JSON mode, response.text sẽ là chuỗi JSON sạch
-            raw_json = response.text.strip()
-            metadata_dict = json.loads(raw_json)
+                raw_json = response.text.strip()
+                metadata_dict = json.loads(raw_json)
 
-            # Hậu xử lý: Merge tags với BASE_TAGS
-            all_tags = metadata_dict.get("tags", [])
-            combined_tags = list(dict.fromkeys(all_tags + BASE_TAGS))[:35]
-            metadata_dict["tags"] = combined_tags
+                # Hậu xử lý: Merge tags với BASE_TAGS
+                all_tags = metadata_dict.get("tags", [])
+                combined_tags = list(dict.fromkeys(all_tags + BASE_TAGS))[:35]
+                metadata_dict["tags"] = combined_tags
 
-            # Validate title length
-            title = metadata_dict.get("title", topic)
-            if len(title) > 100:
-                metadata_dict["title"] = title[:97] + "..."
+                # Validate title length
+                title = metadata_dict.get("title", topic)
+                if len(title) > 100:
+                    metadata_dict["title"] = title[:97] + "..."
 
-            logger.info(f"✅ SEO Metadata OK | Title: {metadata_dict.get('title')[:50]}...")
-            return metadata_dict
+                logger.info(f"✅ SEO Metadata OK ({model_id}) | Title: {metadata_dict.get('title')[:50]}...")
+                return metadata_dict
 
-        except Exception as e:
-            err_str = str(e).lower()
-            logger.warning(f"SEO attempt {attempt+1} lỗi: {err_str}")
-            
-            # Fallback model nếu gemini-2.0-flash chưa khả dụng hoặc hết quota
-            if ("not_found" in err_str or "quota" in err_str or "exhausted" in err_str) and model_id == "gemini-2.0-flash":
-                logger.info("🔄 Chuyển sang model fallback gemini-2.5-flash...")
-                model_id = "gemini-2.5-flash"
-                continue
-
-            if attempt < 2:
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                logger.warning(f"SEO attempt {attempt+1} lỗi ({model_id}): {err_str}")
+                
                 if "429" in err_str or "quota" in err_str or "exhausted" in err_str:
-                    logger.info("⏳ Quá tải API, chờ 30s...")
-                    time.sleep(30)
+                    logger.info("⏳ Hết quota, chờ 45s...")
+                    time.sleep(45)
+                elif "503" in err_str or "unavailable" in err_str:
+                    logger.info("⏳ Dịch vụ quá tải, chờ 15s...")
+                    time.sleep(15)
                 else:
                     time.sleep(5)
+        
+        logger.info(f"Chuyển sang model dự phòng tiếp theo...")
 
     # Fallback cuối cùng nếu AI hoàn toàn thất bại
-    logger.warning("Dùng SEO metadata fallback")
+    logger.warning(f"Dùng SEO metadata fallback sau khi tất cả model lỗi. Lỗi cuối: {last_error}")
     return _fallback_metadata(topic_config)
 
 def _fallback_metadata(topic_config: dict) -> dict:

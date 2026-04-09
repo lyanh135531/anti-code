@@ -1,29 +1,27 @@
 """
 ==========================================================
-  MODULE: SCRIPT GENERATOR
-  Dùng Google Gemini API (miễn phí) để tạo nội dung video
+  MODULE: SCRIPT GENERATOR (NEW SDK)
+  Dùng Google Gemini API (google-genai) để tạo nội dung video
 ==========================================================
 """
 
 import logging
 import time
 import re
-import google.generativeai as genai
-from config import GEMINI_API_KEY
+from google import genai
+from google.genai import types
+from config import GEMINI_API_KEY, GEMINI_MAIN_MODEL, GEMINI_FALLBACK_MODELS
 
 logger = logging.getLogger(__name__)
 
 
-def _configure_gemini():
-    """Cấu hình Gemini API."""
-    genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-3-flash-preview")
+def _get_client():
+    return genai.Client(api_key=GEMINI_API_KEY)
 
 
 def generate_video_script(topic_config: dict) -> dict:
     """
-    Tạo nội dung script cho video dài (7-10 phút).
-    Bao gồm các gợi ý cảnh quay [SCENE: ...] cho AI tạo ảnh.
+    Tạo nội dung script cho video dài (7-10 phút) sử dụng SDK mới.
     """
     topic   = topic_config["topic"]
     religion = topic_config["religion"]
@@ -32,8 +30,11 @@ def generate_video_script(topic_config: dict) -> dict:
 
     logger.info(f"Đang tạo script cho topic: {topic}")
 
-    model = _configure_gemini()
-
+    client = _get_client()
+    
+    # Danh sách các model để thử (Primary + Fallbacks)
+    model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
+    
     prompt = f"""You are an expert YouTube content creator specializing in world religions and spirituality.
 Target Audience: Global (International). Language: English.
 
@@ -61,54 +62,76 @@ Format:
 
 Now write the complete script in English:"""
 
-    for attempt in range(3):
-        try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.85,
-                    max_output_tokens=3000,
+    last_error = None
+    for model_id in model_list:
+        logger.info(f"Sử dụng model: {model_id}")
+        
+        for attempt in range(2): # 2 attempts per model
+            try:
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.8,
+                        max_output_tokens=4000,
+                    )
                 )
-            )
-            script_text = response.text
-            word_count = len(script_text.split())
-            if word_count < 100:
-                raise ValueError(f"Script tạo ra quá ngắn ({word_count} từ).")
-            logger.info(f"Script tạo thành công: {word_count} từ")
-            return {
-                "topic":    topic,
-                "religion": religion,
-                "keywords": keywords,
-                "script":   script_text,
-                "word_count": word_count,
-            }
-        except Exception as e:
-            err_str = str(e)
-            logger.warning(f"Attempt {attempt+1}/3 thất bại: {err_str}")
-            if attempt < 2:
-                time.sleep(5)
+                
+                script_text = response.text
+                if not script_text:
+                    raise ValueError("Nhận được phản hồi rỗng từ AI.")
+                    
+                word_count = len(script_text.split())
+                if word_count < 100:
+                    raise ValueError(f"Script tạo ra quá ngắn ({word_count} từ).")
+                    
+                logger.info(f"Script tạo thành công: {word_count} từ")
+                return {
+                    "topic":    topic,
+                    "religion": religion,
+                    "keywords": keywords,
+                    "script":   script_text,
+                    "word_count": word_count,
+                }
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                logger.warning(f"Lỗi với model {model_id} (lần {attempt+1}): {err_str}")
+                
+                if "429" in err_str or "quota" in err_str:
+                    wait_time = 30
+                    logger.info(f"Hết quota, chờ {wait_time}s...")
+                    time.sleep(wait_time)
+                elif "503" in err_str or "unavailable" in err_str:
+                    wait_time = 10
+                    logger.info(f"Dịch vụ quá tải, chờ {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    time.sleep(5)
+        
+        logger.info(f"Thử model tiếp theo...")
 
-    raise RuntimeError("Không thể tạo script sau 3 lần thử")
+    raise RuntimeError(f"Không thể tạo script sau khi thử tất cả các model. Lỗi cuối: {last_error}")
 
 
 def generate_shorts_script(topic_config: dict, full_script: str) -> str:
     """
     Tạo script ngắn 55-58 giây cho YouTube Shorts.
-    Yêu cầu chính xác 6-10 visual prompts [SCENE: ...].
     """
     hook   = topic_config.get("shorts_hook", topic_config["topic"])
     topic  = topic_config["topic"]
 
     logger.info("Đang tạo script cho Shorts...")
 
-    model = _configure_gemini()
+    client = _get_client()
+    model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
 
     prompt = f"""Create an ultra-engaging YouTube Shorts script in English (55-58 seconds).
 TOPIC: {topic}
 HOOK IDEA: {hook}
 
 CONTEXT FROM FULL VIDEO:
-{full_script[:1000]}
+{full_script[:1500]}
 
 SHORTS SCRIPT REQUIREMENTS:
 - Total spoken words: 120-140 words.
@@ -128,32 +151,33 @@ Format:
 
 Write ONLY the script in English:"""
 
-    for attempt in range(3):
+    last_error = None
+    for model_id in model_list:
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model=model_id,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.9,
-                    max_output_tokens=1000,
+                    max_output_tokens=1500,
                 )
             )
-            shorts_script = response.text.strip()
-            # Kiểm tra số lượng [SCENE:]
-            scene_count = len(re.findall(r'\[SCENE:', shorts_script))
-            if scene_count < 4:
-                raise ValueError(f"Số lượng cảnh quá ít ({scene_count}).")
             
+            shorts_script = response.text.strip()
+            # Kiểm tra sơ bộ định dạng
+            scene_count = len(re.findall(r'\[SCENE:', shorts_script))
+            if scene_count < 3:
+                raise ValueError(f"Định dạng Shorts script không chuẩn (chỉ có {scene_count} cảnh).")
+                
             logger.info(f"Shorts script created with {scene_count} scenes.")
             return shorts_script
         except Exception as e:
-            err_str = str(e)
-            logger.warning(f"Shorts attempt {attempt+1}/3 thất bại: {err_str}")
-            if attempt < 2:
-                time.sleep(5)
+            last_error = e
+            logger.warning(f"Lỗi tạo Shorts với {model_id}: {e}")
+            continue
 
-    # Fallback basic format if AI fails to format correctly
+    # Fallback basic format if AI fails completely
     return f"[SCENE: Cinematic portrait of {topic}]\n{full_script[:140]}"
-
 
 
 def save_script(script_text: str, filename: str, output_dir) -> str:

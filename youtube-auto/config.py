@@ -20,6 +20,7 @@ load_dotenv()
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY",    "YOUR_GEMINI_API_KEY")
 PEXELS_API_KEY    = os.getenv("PEXELS_API_KEY",    "YOUR_PEXELS_API_KEY")
 PIXABAY_API_KEY   = os.getenv("PIXABAY_API_KEY",   "YOUR_PIXABAY_API_KEY")
+POLLINATIONS_API_KEY = os.getenv("POLLINATIONS_API_KEY", "YOUR_POLLINATIONS_API_KEY")
 
 # ============================================================
 # ĐƯỜNG DẪN THƯ MỤC
@@ -48,7 +49,7 @@ VIDEO_HEIGHT   = 1080
 FPS            = 24
 IMAGE_DURATION = 6       # Giây mỗi ảnh (tăng lên nếu ảnh ít)
 FADE_DURATION  = 0.8     # Giây fade chuyển cảnh
-MAX_IMAGES     = 10      # Số ảnh tối đa mỗi video
+MAX_IMAGES     = 9       # 9 ảnh chính + 1 ảnh thumbnail = đúng 10 ảnh (giới hạn Pollen)
 
 # ============================================================
 # CÀI ĐẶT YOUTUBE SHORTS (9:16)
@@ -109,15 +110,21 @@ RELIGION_COLORS = {
 }
 
 # ============================================================
+# AI MODELS (google-genai)
+# ============================================================
+GEMINI_MAIN_MODEL = "gemini-3-flash-preview"
+GEMINI_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",   # Cực kỳ ổn định, quota cao nhất
+]
+
+# ============================================================
+# AI IMAGE MODELS (Pollinations.ai)
+# ============================================================
+AI_IMAGE_MODEL = "flux-schnell"  
+# Các model Pollinations hỗ trợ: "flux", "flux-schnell", "flux-realism", "flux-3d", etc.
+# ============================================================
 # CHỦ ĐỀ VIDEO (Autonomous AI generation)
 # ============================================================
 TARGET_RELIGION = "Christianity"
-
-# ============================================================
-# AI IMAGE MODELS (google-genai)
-# ============================================================
-IMAGEN_MODEL = "gemini-2.5-flash-image"
-# Các lựa chọn (yêu cầu Billing):
-#   "gemini-3.1-flash-image-preview" - Nano Banana 2 (nhanh hơn, yêu cầu paid)
-#   "gemini-3-pro-image-preview"     - Nano Banana Pro (chất lượng cao nhất, paid)
-#   "imagen-4.0-generate-001"        - Imagen 4.0 chuyên dụng (paid)

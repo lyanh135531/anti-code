@@ -55,7 +55,7 @@ from config import (
 # ── Import modules ────────────────────────────────────────--
 from modules.script_gen    import generate_video_script, generate_shorts_script, save_script
 from modules.tts           import text_to_speech, get_audio_duration
-from modules.gemini_image_gen import generate_shorts_images, generate_single_image
+from modules.pollinations_image_gen import generate_shorts_images, generate_single_image
 from modules.video_maker   import build_video
 from modules.thumbnail_maker import create_thumbnail
 from modules.shorts_maker  import create_shorts_from_images
@@ -280,9 +280,8 @@ def run_pipeline(
             shorts_scenes = _parse_visual_scenes(shorts_raw)
             shorts_script = _clean_script_for_tts(shorts_raw)
             
-            # Tạo ảnh riêng cho Shorts (Portrait)
-            shorts_img_dir = img_dir / "shorts"
-            shorts_image_paths = generate_shorts_images(shorts_scenes, shorts_img_dir, f"{video_id}_sh")
+            # Tái sử dụng ảnh từ video chính để tiết kiệm giới hạn 10 ảnh của Pollinations
+            shorts_image_paths = image_paths.copy() if image_paths else []
 
             shorts_audio_path = str(OUTPUT_DIR / "audio" / f"{video_id}_shorts.mp3")
             text_to_speech(shorts_script, shorts_audio_path, voice=TTS_VOICE, rate="+5%")

@@ -1,7 +1,7 @@
 """
 ==========================================================
-  MODULE: IDEA GENERATOR
-  Dùng Google Gemini API để tự động sáng tạo chủ đề
+  MODULE: IDEA GENERATOR (NEW SDK)
+  Dùng Google Gemini API (google-genai) để tự động sáng tạo chủ đề
 ==========================================================
 """
 
@@ -10,37 +10,41 @@ import time
 import re
 import json
 import os
-import google.generativeai as genai
-from config import GEMINI_API_KEY
+from google import genai
+from google.genai import types
+from config import GEMINI_API_KEY, GEMINI_MAIN_MODEL, GEMINI_FALLBACK_MODELS
 
 logger = logging.getLogger(__name__)
 
 HISTORY_FILE = ".topic_history.txt"
 
-def _configure_gemini():
-    """Cấu hình Gemini API."""
-    genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-3-flash-preview")
+
+def _get_client():
+    return genai.Client(api_key=GEMINI_API_KEY)
+
 
 def _get_past_topics() -> list:
     if not os.path.exists(HISTORY_FILE):
         return []
     with open(HISTORY_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-    return [line.strip() for line in lines if line.strip()][-50:] # Lấy 50 bài gần nhất
+    return [line.strip() for line in lines if line.strip()][-50:]  # Lấy 50 bài gần nhất
+
 
 def _save_topic_to_history(topic: str):
     with open(HISTORY_FILE, "a", encoding="utf-8") as f:
         f.write(f"{topic}\n")
 
+
 def generate_new_topic(target_religion: str = "Christianity") -> dict:
     """
     Sáng tạo một chủ đề hoàn toàn mới chưa từng làm.
+    Tự động thử nhiều model fallback nếu model chính hết quota.
     """
     logger.info("Đang sáng tạo chủ đề mới...")
-    model = _configure_gemini()
+    client = _get_client()
     past_topics = _get_past_topics()
-    
+
     history_str = "\n".join([f"- {t}" for t in past_topics]) if past_topics else "Chưa có video nào."
 
     prompt = f"""You are an expert YouTube content strategist for a channel dedicated to {target_religion}.
@@ -59,49 +63,68 @@ Return ONLY a valid JSON object with these keys:
 Do NOT include markdown like ```json. Return raw valid JSON.
 """
 
-    for attempt in range(3):
-        try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.9,
-                    max_output_tokens=800,
+    # Danh sách model theo thứ tự ưu tiên
+    model_list = [GEMINI_MAIN_MODEL] + GEMINI_FALLBACK_MODELS
+    last_error = None
+
+    for model_id in model_list:
+        logger.info(f"Thử tạo ý tưởng với model: {model_id}")
+        for attempt in range(2):  # 2 lần thử mỗi model
+            try:
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.9,
+                        max_output_tokens=1500,
+                    )
                 )
-            )
-            
-            raw = response.text.strip()
-            # Xóa các markdown block
-            if raw.startswith("```json"):
-                raw = raw[7:]
-            if raw.startswith("```"):
-                raw = raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            raw = raw.strip()
 
-            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-            if json_match:
-                raw = json_match.group()
-            
-            topic_config = json.loads(raw, strict=False)
-            
-            # Validate essential keys
-            for key in ["topic", "religion", "keywords", "script_angle", "shorts_hook"]:
-                if key not in topic_config:
-                    raise ValueError(f"Thiếu key {key} trong JSON trả về")
-            
-            _save_topic_to_history(topic_config["topic"])
-            logger.info(f"Đã lên ý tưởng thành công: {topic_config['topic']}")
-            return topic_config
+                raw = response.text.strip()
+                
+                # Dọn dấu markdown nếu có
+                raw = re.sub(r'^```json\s*', '', raw)
+                raw = re.sub(r'^```\s*', '', raw)
+                raw = re.sub(r'```$', '', raw).strip()
 
-        except Exception as e:
-            err_str = str(e)
-            logger.warning(f"Sáng tạo ý tưởng lần {attempt+1}/3 thất bại: {err_str}")
-            if attempt < 2:
-                if "429" in err_str or "quota" in err_str.lower() or "retry in" in err_str.lower():
-                    logger.info("⏳ Quá tải Gemini API (Rate Limit), tạm dừng 45s trước khi thử lại...")
-                    time.sleep(45)
+                # Tìm JSON object trong text
+                json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+                if json_match:
+                    raw = json_match.group()
+
+                # Parse JSON
+                topic_config = json.loads(raw)
+
+                # Validate essential keys
+                for key in ["topic", "religion", "keywords", "script_angle", "shorts_hook"]:
+                    if key not in topic_config:
+                        raise ValueError(f"Thiếu key '{key}' trong JSON trả về")
+
+                _save_topic_to_history(topic_config["topic"])
+                logger.info(f"Đã lên ý tưởng thành công ({model_id}): {topic_config['topic']}")
+                return topic_config
+
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                logger.warning(f"Lần {attempt+1}/2 thất bại ({model_id}): {err_str[:200]}")
+
+                is_quota_error = "429" in err_str or "quota" in err_str or "exhausted" in err_str
+                is_overload_error = "503" in err_str or "unavailable" in err_str
+
+                if is_quota_error:
+                    # Quota hết → chuyển ngay sang model tiếp theo, không retry
+                    logger.info(f"Hết quota model {model_id} → chuyển model...")
+                    break  # Thoát vòng attempt, sang model tiếp theo
+                elif is_overload_error:
+                    logger.info("Server quá tải, chờ 10s...")
+                    time.sleep(10)
                 else:
                     time.sleep(5)
 
-    raise RuntimeError("Không thể sáng tạo chủ đề sau 3 lần thử.")
+        logger.info(f"Thử model tiếp theo...")
+
+    raise RuntimeError(
+        f"Không thể sáng tạo chủ đề sau khi thử tất cả {len(model_list)} model. "
+        f"Lỗi cuối: {last_error}"
+    )
