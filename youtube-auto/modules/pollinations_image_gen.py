@@ -22,11 +22,27 @@ def generate_single_image(prompt: str, output_path: str | Path, width: int = 108
     Tạo một ảnh từ prompt bằng Pollinations API.
     Sử dụng model được cấu hình (ví dụ: flux-schnell).
     """
+    # Style suffix: có thể dùng anime/painting style để tránh lỗi gương mặt
+    STYLE_SUFFIX = (
+        "cinematic digital painting, anime art style, Studio Ghibli-inspired, "
+        "warm golden lighting, rich colors, no ugly faces, beautiful scenery"
+    )
+    NEGATIVE_PROMPT = (
+        "realistic face, photorealistic, ugly face, deformed face, distorted face, "
+        "bad anatomy, extra limbs, blurry, low quality, watermark, text, signature"
+    )
+
     logger.info(f"Đang tạo ảnh bằng Pollinations ({AI_IMAGE_MODEL}): {prompt[:60]}...")
-    
-    encoded_prompt = urllib.parse.quote(f"{prompt}, high quality, cinematic, masterpiece")
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={AI_IMAGE_MODEL}&nologo=true"
-    
+
+    full_prompt = f"{prompt}, {STYLE_SUFFIX}"
+    encoded_prompt = urllib.parse.quote(full_prompt)
+    encoded_negative = urllib.parse.quote(NEGATIVE_PROMPT)
+    url = (
+        f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+        f"?width={width}&height={height}&model={AI_IMAGE_MODEL}&nologo=true"
+        f"&negative_prompt={encoded_negative}&enhance=false&safe=false"
+    )
+
     headers = {}
     if POLLINATIONS_API_KEY and POLLINATIONS_API_KEY != "YOUR_POLLINATIONS_API_KEY":
         headers["Authorization"] = f"Bearer {POLLINATIONS_API_KEY}"
@@ -116,7 +132,7 @@ def generate_shorts_images(
         # Let's inspect main.py to see how `generate_shorts_images` is used. I'll just keep the default 1024x1024 for safety, or 1080x1920.
         # Let's use 1024x1024 as default for AI gen. Pollinations handles up to 1024 safely.
         
-        if generate_single_image(prompt, save_path, width=1024, height=1024):
+        if generate_single_image(prompt, save_path, width=768, height=1344):
             downloaded_paths.append(str(save_path))
         else:
             logger.error(f"Scene {i+1}: tạo ảnh thất bại → bỏ qua.")

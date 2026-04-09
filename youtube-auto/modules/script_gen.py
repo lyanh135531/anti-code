@@ -49,11 +49,26 @@ KEYWORDS: {', '.join(keywords)}
 STRICT RULES:
 1. Write EXACTLY {SHORTS_SCENES_COUNT} scenes using format: [SCENE: description]
 2. Total spoken words: {SHORTS_WORDS_MIN}–{SHORTS_WORDS_MAX} words
-3. Each [SCENE: ...] MUST describe a SPECIFIC Biblical/Christian visual:
-   ✅ GOOD: "Jesus healing a blind man in ancient Jerusalem, golden divine light streaming down"
-   ✅ GOOD: "Open Bible showing John 3:16, glowing with ethereal light on a wooden table"
-   ❌ BAD: "a person meditating", "nature landscape", "peaceful scenery"
-4. Spoken text per scene: 2–3 short punchy phrases
+3. Each [SCENE: ...] MUST describe a SPECIFIC Biblical/Christian visual in ANIME/PAINTING style.
+   FACE RULES — VERY IMPORTANT:
+   ❌ NEVER write "close-up face of Jesus/person" — this causes AI face distortions
+   ✅ INSTEAD use: wide shots, silhouettes, back views, hands only, symbolic objects, landscapes
+   
+   GOOD examples:
+   ✅ "Silhouette of Jesus with arms open on a hilltop at sunset, anime painting style, golden sky"
+   ✅ "Hands of Jesus gently touching an open Bible, warm candlelight, Studio Ghibli style"
+   ✅ "Ancient Jerusalem skyline at dusk, anime art style, warm amber tones, cross on a hill"
+   ✅ "A glowing dove descending from heaven through golden clouds, anime painting"
+   ✅ "Open Bible with John 3:16 glowing softly, ethereal light, cinematic painting"
+   ✅ "A wooden cross on a hilltop, dramatic sunset, anime cinematic style"
+   ✅ "Person kneeling in prayer in silhouette inside a cathedral, golden light rays"
+   
+   BAD examples:
+   ❌ "Close-up of Jesus's face filled with compassion"
+   ❌ "Realistic portrait of a man looking at camera"
+   ❌ "Photorealistic face of a grieving woman"
+
+4. Spoken text per scene: 2–3 short punchy lines
 5. Open with the hook line. Close with call-to-faith: "Follow for daily Scripture" or similar.
 6. Tone: awe-inspiring, warm, faith-building
 
