@@ -155,8 +155,14 @@ def run_pipeline(
         audio_dur = get_audio_duration(audio_path)
         logger.info(f"  ✅ Audio: {audio_dur:.1f}s")
 
-        if audio_dur > 65:
-            logger.warning(f"  ⚠️ Audio khá dài ({audio_dur:.1f}s) — Shorts sẽ bị cắt ở 59s")
+        # Shorts phải dưới 60s — nếu bị cắt thì không phải Shorts hợp lệ
+        if audio_dur > 58:
+            logger.error(
+                f"  ❌ Audio quá dài ({audio_dur:.1f}s)! "
+                f"Script phải dưới 90 từ. Hãy thử lại (script khác sẽ được gen)."
+            )
+            results["errors"].append(f"TTS too long: {audio_dur:.1f}s")
+            return results
     except Exception as e:
         logger.error(f"  ❌ Lỗi TTS: {e}")
         results["errors"].append(f"TTS: {e}")

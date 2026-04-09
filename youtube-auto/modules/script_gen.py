@@ -14,8 +14,8 @@ from modules.pollinations_text import chat_complete
 logger = logging.getLogger(__name__)
 
 SHORTS_SCENES_COUNT = 9
-SHORTS_WORDS_MIN    = 100   # ~45s
-SHORTS_WORDS_MAX    = 130   # ~58s
+SHORTS_WORDS_MIN    = 65    # ~35s — đủ nội dung
+SHORTS_WORDS_MAX    = 90    # ~50s — an toàn dưới 60s (Brian ≈ 110 WPM)
 
 
 def generate_shorts_script(topic_config: dict) -> dict:
@@ -48,7 +48,9 @@ KEYWORDS: {', '.join(keywords)}
 
 STRICT RULES:
 1. Write EXACTLY {SHORTS_SCENES_COUNT} scenes using format: [SCENE: description]
-2. Total spoken words: {SHORTS_WORDS_MIN}–{SHORTS_WORDS_MAX} words
+2. Total spoken words: MAXIMUM {SHORTS_WORDS_MAX} words total (this is CRITICAL — the video must be under 58 seconds)
+   - Each scene gets MAXIMUM 10 spoken words (1-2 short phrases only, NO long sentences)
+   - Count carefully: {SHORTS_SCENES_COUNT} scenes × 10 words = 90 words max
 3. Each [SCENE: ...] MUST describe a SPECIFIC Biblical/Christian visual in ANIME/PAINTING style.
    FACE RULES — VERY IMPORTANT:
    ❌ NEVER write "close-up face of Jesus/person" — this causes AI face distortions
@@ -68,8 +70,8 @@ STRICT RULES:
    ❌ "Realistic portrait of a man looking at camera"
    ❌ "Photorealistic face of a grieving woman"
 
-4. Spoken text per scene: 2–3 short punchy lines
-5. Open with the hook line. Close with call-to-faith: "Follow for daily Scripture" or similar.
+4. Spoken text per scene: MAXIMUM 10 words (1-2 short punchy lines — NOT full sentences)
+5. Open with the hook line (under 10 words). Close with ultra-short call-to-faith.
 6. Tone: awe-inspiring, warm, faith-building
 
 EXACT FORMAT (repeat {SHORTS_SCENES_COUNT} times):
@@ -95,8 +97,29 @@ Write the complete script now:"""
     )
 
     word_count = len(clean_script.split())
-    if word_count < 60:
+    if word_count < 30:
         raise ValueError(f"Script too short: {word_count} words")
+
+    # ── Hard trim nếu AI vẫn gen quá dài ─────────────────────────────────
+    # Mục tiêu: tối đa SHORTS_WORDS_MAX từ → ~50s audio → an toàn dưới 60s
+    HARD_WORD_LIMIT = SHORTS_WORDS_MAX + 10  # buffer 10 từ
+    if word_count > HARD_WORD_LIMIT:
+        logger.warning(
+            f"Script quá dài ({word_count} từ > {HARD_WORD_LIMIT}). "
+            f"Tự động cắt để đảm bảo dưới 60s..."
+        )
+        words = clean_script.split()
+        trimmed = " ".join(words[:HARD_WORD_LIMIT])
+        # Cắt tại câu hoàn chỉnh gần nhất
+        for punct in ('.', '!', '?'):
+            last_sent = trimmed.rfind(punct)
+            if last_sent > len(trimmed) // 2:
+                trimmed = trimmed[:last_sent + 1]
+                break
+        clean_script = trimmed
+        word_count = len(clean_script.split())
+        logger.info(f"Script sau khi cắt: {word_count} từ")
+    # ─────────────────────────────────────────────────────────────────────
 
     scenes = _parse_scenes(raw_script)
     logger.info(f"✅ Script OK: {scene_count} cảnh, {word_count} từ")
