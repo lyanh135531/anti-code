@@ -47,6 +47,17 @@ def authenticate_youtube():
 
     creds = None
 
+    # ── Hỗ trợ GitHub Actions: Decode token từ Secrets ────────
+    token_b64 = os.getenv("YOUTUBE_TOKEN_BASE64")
+    if token_b64 and not TOKEN_FILE.exists():
+        import base64
+        try:
+            with open(TOKEN_FILE, "wb") as f:
+                f.write(base64.b64decode(token_b64))
+            logger.info("Đã khôi phục YouTube token từ biến môi trường (Base64)")
+        except Exception as e:
+            logger.error(f"Lỗi giải mã YOUTUBE_TOKEN_BASE64: {e}")
+
     # Load token đã lưu
     if TOKEN_FILE.exists():
         with open(TOKEN_FILE, "rb") as f:

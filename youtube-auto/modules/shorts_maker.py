@@ -102,8 +102,15 @@ def create_shorts_from_video(
         draw.rectangle([(0, top_h - 3), (W, top_h + 3)], fill=(255, 200, 50))
 
         # ── Channel name ───────────────────────────────────
+        from config import FONTS_DIR
+        font_ch_path = FONTS_DIR / "arialbd.ttf"
         try:
-            font_ch = ImageFont.truetype("arialbd.ttf", 32) if os.path.exists("C:/Windows/Fonts/arialbd.ttf") else ImageFont.load_default()
+            if font_ch_path.exists():
+                font_ch = ImageFont.truetype(str(font_ch_path), 32)
+            elif os.name == 'nt' and os.path.exists("C:/Windows/Fonts/arialbd.ttf"):
+                font_ch = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 32)
+            else:
+                font_ch = ImageFont.load_default()
         except Exception:
             font_ch = ImageFont.load_default()
 
@@ -111,8 +118,14 @@ def create_shorts_from_video(
         draw.text((W//2 - 120, top_h + 30), ch_text, font=font_ch, fill=(255, 220, 100))
 
         # ── Shorts label ───────────────────────────────────
+        font_sub_path = FONTS_DIR / "arial.ttf"
         try:
-            font_sub = ImageFont.truetype("arial.ttf", 26) if os.path.exists("C:/Windows/Fonts/arial.ttf") else ImageFont.load_default()
+            if font_sub_path.exists():
+                font_sub = ImageFont.truetype(str(font_sub_path), 26)
+            elif os.name == 'nt' and os.path.exists("C:/Windows/Fonts/arial.ttf"):
+                font_sub = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 26)
+            else:
+                font_sub = ImageFont.load_default()
         except Exception:
             font_sub = ImageFont.load_default()
 
@@ -235,9 +248,15 @@ def create_shorts_from_images(
         if not lines:
             return pil_img
 
+        from config import FONTS_DIR
         try:
-            font_path = "C:/Windows/Fonts/arialbd.ttf" if os.name == 'nt' else None
-            font = ImageFont.truetype(font_path, 72) if font_path else ImageFont.load_default()
+            font_path_abs = FONTS_DIR / "arialbd.ttf"
+            if font_path_abs.exists():
+                font = ImageFont.truetype(str(font_path_abs), 72)
+            elif os.name == 'nt' and os.path.exists("C:/Windows/Fonts/arialbd.ttf"):
+                font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 72)
+            else:
+                font = ImageFont.load_default()
         except Exception:
             font = ImageFont.load_default()
 
