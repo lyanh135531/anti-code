@@ -2,8 +2,8 @@ name: Daily YouTube Shorts
 
 on:
   schedule:
-    # Chạy lúc 06:30 UTC mỗi ngày (tương đương 13:30 chiều GMT+7)
-    - cron: "30 6 * * *"
+    # Chạy lúc 06:45 UTC mỗi ngày (tương đương 13:45 chiều GMT+7)
+    - cron: "45 6 * * *"
   workflow_dispatch:
     # Cho phép chạy thủ công từ tab Actions
     inputs:
@@ -16,6 +16,9 @@ on:
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./youtube-auto
 
     steps:
       - name: Checkout code
