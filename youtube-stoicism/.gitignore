@@ -1,0 +1,36 @@
+# Python / Environment
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+
+# Environment Variables & Secrets
+.env
+client_secrets.json
+youtube_token.pickle
+
+# Application Data & Outputs
+logs/
+output/
+.topic_counter
+
+# IDE / OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# MoviePy & Media Temp Files
+*TEMP_MPY*
+*.mp4
+*.mp3
+*.wav
+!assets/music/*.mp3
+!assets/music/*.wav
+
+# Extra
+*.log
+.pytest_cache/
+.mypy_cache/

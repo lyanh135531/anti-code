@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  youtube-auto:
+    build: .
+    container_name: youtube-auto-bot
+    restart: unless-stopped
+    volumes:
+      # Map toàn bộ thư mục để container đọc ghi trực tiếp:
+      # - /output: Để lưu file video/audio
+      # - /logs: Để ghi log file
+      # - .env & client_secrets.json
+      # - .topic_counter và youtube_token.pickle (lưu giữ state khi restart container)
+      - .:/app
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      # - RUN_NOW=true    # Bỏ comment nếu muốn chạy ngay lúc khởi động container (tuỳ chọn)
