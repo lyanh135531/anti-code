@@ -24,6 +24,9 @@ jobs:
     defaults:
       run:
         working-directory: ./youtube-stoicism
+    env:
+      STOICISM_YOUTUBE_TOKEN_BASE64: ${{ secrets.STOICISM_YOUTUBE_TOKEN_BASE64 }}
+      STOICISM_CLIENT_SECRETS_BASE64: ${{ secrets.STOICISM_CLIENT_SECRETS_BASE64 }}
 
     steps:
       - name: Checkout code
@@ -46,18 +49,14 @@ jobs:
           pip install -r requirements.txt
 
       - name: Create or Update youtube_token.pickle from Secret
-        if: ${{ secrets.STOICISM_YOUTUBE_TOKEN_BASE64 != '' }}
-        env:
-          YOUTUBE_TOKEN_BASE64: ${{ secrets.STOICISM_YOUTUBE_TOKEN_BASE64 }}
+        if: env.STOICISM_YOUTUBE_TOKEN_BASE64 != ''
         run: |
-          echo "$YOUTUBE_TOKEN_BASE64" | base64 --decode > youtube_token.pickle
+          echo "${{ env.STOICISM_YOUTUBE_TOKEN_BASE64 }}" | base64 --decode > youtube_token.pickle
           
       - name: Create client_secrets.json from Secret
-        if: ${{ secrets.STOICISM_CLIENT_SECRETS_BASE64 != '' }}
-        env:
-          CLIENT_SECRETS_BASE64: ${{ secrets.STOICISM_CLIENT_SECRETS_BASE64 }}
+        if: env.STOICISM_CLIENT_SECRETS_BASE64 != ''
         run: |
-          echo "$CLIENT_SECRETS_BASE64" | base64 --decode > client_secrets.json
+          echo "${{ env.STOICISM_CLIENT_SECRETS_BASE64 }}" | base64 --decode > client_secrets.json
 
       - name: Run Pipeline
         env:
