@@ -21,6 +21,8 @@ def create_shorts_from_video(
     H: int = 1920,
     fps: int = 24,
     channel_name: str = "Sacred Wisdom Daily",
+    music_path:   str | Path = None,
+    music_volume: float = 0.10,
 ) -> str:
     """
     Tạo YouTube Shorts 9:16 từ video 16:9 chính.
@@ -38,7 +40,7 @@ def create_shorts_from_video(
     try:
         from moviepy import (
             VideoFileClip, AudioFileClip, VideoClip,
-            CompositeVideoClip, ColorClip, vfx
+            CompositeVideoClip, ColorClip, vfx, CompositeAudioClip, afx
         )
         import numpy as np
         from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -58,6 +60,19 @@ def create_shorts_from_video(
     final_dur    = min(main_dur, audio_dur)
 
     shorts_audio = shorts_audio.subclipped(0, final_dur)
+
+    # ── 2b. Ghép nhạc nền ──────────────────────────────────
+    if music_path and os.path.exists(music_path):
+        try:
+            music_clip = AudioFileClip(str(music_path)).with_volume_scaled(music_volume)
+            if music_clip.duration < final_dur:
+                music_clip = music_clip.with_effects([afx.AudioLoop(duration=final_dur)]).subclipped(0, final_dur)
+            else:
+                music_clip = music_clip.subclipped(0, final_dur)
+            shorts_audio = CompositeAudioClip([shorts_audio, music_clip])
+            logger.info(f"Đã thêm nhạc nền cho Shorts.")
+        except Exception as e:
+            logger.warning(f"Không thể thêm nhạc nền vào Shorts: {e}")
 
     # ── 3. Tạo video Shorts bằng PIL frame-by-frame ───────
     # Lấy video gốc 1920x1080 và tạo layout 1080x1920:
@@ -152,6 +167,15 @@ def create_shorts_from_video(
         logger        = None
     )
 
+    if music_path and os.path.exists(music_path):
+        try:
+            music_clip.close()
+        except: pass
+    
+    try:
+        shorts_audio.close()
+    except: pass
+
     main_clip.close()
     shorts_clip.close()
     main_clip_trimmed.close()
@@ -170,6 +194,8 @@ def create_shorts_from_images(
     W: int       = 1080,
     H: int       = 1920,
     vtt_path:    str = None,
+    music_path:   str | Path = None,
+    music_volume: float = 0.15,
 ) -> str:
     """
     Tạo Shorts chuyên nghiệp từ ảnh AI.
@@ -178,7 +204,7 @@ def create_shorts_from_images(
     - Không logo, tập trung thị trường quốc tế (Anh)
     """
     try:
-        from moviepy import AudioFileClip, VideoClip, vfx
+        from moviepy import AudioFileClip, VideoClip, vfx, CompositeAudioClip, afx
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
     except ImportError:
@@ -342,7 +368,26 @@ def create_shorts_from_images(
         return np.array(pil)
 
     clip = VideoClip(make_frame, duration=total_dur).with_fps(fps)
-    clip = clip.with_audio(audio_clip.subclipped(0, total_dur))
+    
+    # ── Ghép audio + nhạc nền ──────────────────────────────
+    main_audio = audio_clip.subclipped(0, total_dur)
+    
+    if music_path and os.path.exists(music_path):
+        try:
+            music_clip = AudioFileClip(str(music_path)).with_volume_scaled(music_volume)
+            if music_clip.duration < total_dur:
+                music_clip = music_clip.with_effects([afx.AudioLoop(duration=total_dur)]).subclipped(0, total_dur)
+            else:
+                music_clip = music_clip.subclipped(0, total_dur)
+            final_audio = CompositeAudioClip([main_audio, music_clip])
+            logger.info(f"Đã thêm nhạc nền.")
+        except Exception as e:
+            logger.warning(f"Lỗi nhạc nền: {e}")
+            final_audio = main_audio
+    else:
+        final_audio = main_audio
+
+    clip = clip.with_audio(final_audio)
 
     # Xuất file libx264 chất lượng cao
     clip.write_videofile(
@@ -353,6 +398,15 @@ def create_shorts_from_images(
         preset        = "medium",
         logger        = None
     )
+
+    if music_path and os.path.exists(music_path):
+        try:
+            music_clip.close()
+        except: pass
+
+    try:
+        final_audio.close()
+    except: pass
 
     clip.close()
     audio_clip.close()

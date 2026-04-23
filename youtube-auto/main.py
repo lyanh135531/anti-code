@@ -53,7 +53,7 @@ from config import (
     TARGET_RELIGION, OUTPUT_DIR, MUSIC_DIR,
     TTS_VOICE, TTS_RATE, TTS_PITCH,
     FADE_DURATION, SHORTS_MAX_IMAGES,
-    SHORTS_WIDTH, SHORTS_HEIGHT, SHORTS_FPS,
+    SHORTS_WIDTH, SHORTS_HEIGHT, SHORTS_FPS, MUSIC_VOLUME,
     CHANNEL_NAME, YOUTUBE_CATEGORY, YOUTUBE_LANGUAGE, YOUTUBE_PRIVACY,
 )
 
@@ -212,6 +212,8 @@ def run_pipeline(
             W            = SHORTS_WIDTH,
             H            = SHORTS_HEIGHT,
             vtt_path     = srt_path if Path(srt_path).exists() else None,
+            music_path   = music_path,
+            music_volume = MUSIC_VOLUME,
         )
         results["shorts_path"] = shorts_path
         logger.info(f"  ✅ Shorts: {shorts_path}")

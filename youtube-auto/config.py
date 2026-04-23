@@ -52,6 +52,7 @@ SHORTS_HEIGHT     = 1920
 SHORTS_FPS        = 24
 SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video (Pollinations limit = 10, giữ 1 dự phòng)
 FADE_DURATION     = 0.5      # Giây fade chuyển cảnh
+MUSIC_VOLUME      = 0.15     # Âm lượng nhạc nền cho Shorts
 
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
 FPS          = SHORTS_FPS
