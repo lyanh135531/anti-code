@@ -119,7 +119,7 @@ RELIGION_COLORS = {
 # ============================================================
 # AI IMAGE MODELS (Pollinations.ai) — tốn Pollen
 # ============================================================
-AI_IMAGE_MODEL = "flux-schnell"
+AI_IMAGE_MODEL = "flux"
 # Các model: "flux", "flux-schnell", "zimage", "flux-realism"
 
 # ============================================================

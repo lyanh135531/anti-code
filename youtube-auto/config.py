@@ -52,7 +52,7 @@ SHORTS_HEIGHT     = 1920
 SHORTS_FPS        = 24
 SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video (Pollinations limit = 10, giữ 1 dự phòng)
 FADE_DURATION     = 0.5      # Giây fade chuyển cảnh
-MUSIC_VOLUME      = 0.15     # Âm lượng nhạc nền cho Shorts
+MUSIC_VOLUME      = 0.4     # Âm lượng nhạc nền cho Shorts
 
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
 FPS          = SHORTS_FPS
@@ -120,7 +120,7 @@ RELIGION_COLORS = {
 # ============================================================
 # AI IMAGE MODELS (Pollinations.ai) — tốn Pollen
 # ============================================================
-AI_IMAGE_MODEL = "flux-schnell"
+AI_IMAGE_MODEL = "flux"
 # Các model: "flux", "flux-schnell", "zimage", "flux-realism"
 
 # ============================================================
