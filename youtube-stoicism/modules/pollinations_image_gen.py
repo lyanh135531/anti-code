@@ -38,7 +38,7 @@ def generate_single_image(prompt: str, output_path: str | Path, width: int = 108
     encoded_prompt = urllib.parse.quote(full_prompt)
     encoded_negative = urllib.parse.quote(NEGATIVE_PROMPT)
     url = (
-        f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+        f"https://gen.pollinations.ai/image/{encoded_prompt}"
         f"?width={width}&height={height}&model={AI_IMAGE_MODEL}&nologo=true"
         f"&negative_prompt={encoded_negative}&enhance=false&safe=false"
     )
