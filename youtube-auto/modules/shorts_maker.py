@@ -44,8 +44,8 @@ def create_shorts_from_video(
         )
         import numpy as np
         from PIL import Image, ImageFilter, ImageDraw, ImageFont
-    except ImportError:
-        raise ImportError("Cần cài moviepy: pip install moviepy")
+    except ImportError as e:
+        raise ImportError(f"Import lỗi khi dựng Shorts: {e}") from e
 
     output_path = Path(output_path)
     logger.info(f"Tạo Shorts: {output_path.name}")
@@ -207,8 +207,8 @@ def create_shorts_from_images(
         from moviepy import AudioFileClip, VideoClip, vfx, CompositeAudioClip, afx
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
-    except ImportError:
-        raise ImportError("Cần cài moviepy")
+    except ImportError as e:
+        raise ImportError(f"Import lỗi khi dựng Shorts từ ảnh: {e}") from e
 
     output_path  = Path(output_path)
     audio_clip   = AudioFileClip(str(audio_path))
@@ -220,13 +220,12 @@ def create_shorts_from_images(
 
     logger.info(f"Dựng Shorts AI: {n_imgs} ảnh | {total_dur:.1f}s")
 
-    # Xử lý Subtitles: Nhóm 3-4 từ
-    subs = []
+    # Xử lý Subtitles: Word-by-word timing
+    subtitle_phrases = []
     if vtt_path and os.path.exists(vtt_path):
-        from modules.video_maker import parse_vtt, group_subs
-        raw_subs = parse_vtt(str(vtt_path))
-        subs = group_subs(raw_subs, max_words=4) 
-        logger.info(f"Đã nạp {len(subs)} cụm phụ đề.")
+        from modules.subtitle_parser import parse_srt_to_phrases
+        subtitle_phrases = parse_srt_to_phrases(str(vtt_path))
+        logger.info(f"Đã nạp {len(subtitle_phrases)} phrases cho word-by-word subtitle.")
 
     # Pre-load và scale ảnh (Portrait)
     # Chúng ta lấy ảnh to hơn 1 chút để có không gian zoom
@@ -257,84 +256,168 @@ def create_shorts_from_images(
 
     directions = ["in", "out"] * (len(scaled_imgs) // 2 + 1)
 
-    def _add_phrase_subtitle(pil_img, text, W, H):
+    def _add_word_highlight_subtitle(pil_img, subtitle_phrases, t, W, H):
         """
-        Vẽ phụ đề Shorts chuẩn:
-        - Vị trí: ~75% chiều cao (phía dưới, tránh UI YouTube)
-        - Font: Bold 90px, chữ HOA
-        - Nền: Box tối mờ (semi-transparent) để luôn dễ đọc
-        - Màu chữ: Trắng với viền đen
+        Word-by-word highlight subtitle (Modern Highlighted Phrase Style).
+        - Active word: large, yellow (#FFD700), centered in its slot with a thick outline
+        - Inactive words: smaller, white, centered in their slots with a thin outline
+        - All words laid out statically based on active word size (no layout shifts)
+        - Position: upper-center (centered around ~45% height) inside a dark pill background
         """
-        import textwrap
+        from modules.subtitle_parser import get_active_word
         from PIL import ImageFont, ImageDraw, Image as PILImage
-
-        # Tách dòng nếu text quá dài (tối đa 18 ký tự/dòng cho portrait)
-        text = text.upper()
-        lines = textwrap.wrap(text, width=18)
-        if not lines:
+        
+        active = get_active_word(subtitle_phrases, t)
+        if not active:
             return pil_img
-
+        
+        word_text, word_idx, phrase_idx = active
+        phrase = subtitle_phrases[phrase_idx]
+        all_words = [w.word.upper() for w in phrase.words]
+        
+        # Fonts
         from config import FONTS_DIR
         try:
-            font_path_abs = FONTS_DIR / "arialbd.ttf"
-            if font_path_abs.exists():
-                font = ImageFont.truetype(str(font_path_abs), 72)
+            font_large_path = FONTS_DIR / "arialbd.ttf"
+            if font_large_path.exists():
+                font_base = ImageFont.truetype(str(font_large_path), 64)
+                font_active = ImageFont.truetype(str(font_large_path), 78)
             elif os.name == 'nt' and os.path.exists("C:/Windows/Fonts/arialbd.ttf"):
-                font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 72)
+                font_base = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 64)
+                font_active = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 78)
             else:
-                font = ImageFont.load_default()
+                font_base = ImageFont.load_default()
+                font_active = ImageFont.load_default()
         except Exception:
-            font = ImageFont.load_default()
-
-        draw = ImageDraw.Draw(pil_img)
-
-        # Đo toàn bộ block text
-        line_bboxes = []
-        for ln in lines:
-            bb = draw.textbbox((0, 0), ln, font=font)
-            line_bboxes.append((bb[2] - bb[0], bb[3] - bb[1]))
-
-        line_h = line_bboxes[0][1] if line_bboxes else 80
-        line_gap = 12
-        total_text_h = len(lines) * line_h + (len(lines) - 1) * line_gap
-        max_text_w = max(w for w, _ in line_bboxes)
-
-        # Vị trí: giữa theo chiều ngang, 75% theo chiều dọc
-        pad_x, pad_y = 40, 24
-        box_x = (W - max_text_w) // 2 - pad_x
-        box_y = int(H * 0.74) - pad_y
-        box_w = max_text_w + pad_x * 2
-        box_h = total_text_h + pad_y * 2
-
-        # Vẽ background pill box (semi-transparent đen)
-        overlay = PILImage.new("RGBA", pil_img.size, (0, 0, 0, 0))
+            font_base = ImageFont.load_default()
+            font_active = ImageFont.load_default()
+            
+        img = pil_img.convert("RGBA")
+        draw = ImageDraw.Draw(img)
+        
+        # Để layout ổn định và không đè chữ, ta đo kích thước tất cả từ theo font_active (max size)
+        space_w = int(draw.textlength(" ", font=font_active))
+        word_gap = space_w + 10  # Khoảng cách giữa các từ (int)
+        
+        # Đo kích thước từng từ theo cả 2 font (luôn là int để tránh lỗi vị trí)
+        word_sizes_base = []
+        word_sizes_active = []
+        for w in all_words:
+            w_base = int(draw.textlength(w, font=font_base))
+            w_act  = int(draw.textlength(w, font=font_active))
+            bb_base = draw.textbbox((0, 0), w, font=font_base)
+            bb_act  = draw.textbbox((0, 0), w, font=font_active)
+            word_sizes_base.append((w_base,  bb_base[3] - bb_base[1]))
+            word_sizes_active.append((w_act, bb_act[3]  - bb_act[1]))
+            
+        # Chia dòng tự động dựa trên kích thước active để luôn đủ chỗ vẽ
+        max_line_width = W - 160  # Margin 80px mỗi bên
+        lines = []
+        current_line = []
+        current_width = 0
+        
+        for idx, w in enumerate(all_words):
+            ww_act, wh_act = word_sizes_active[idx]
+            if current_line and current_width + word_gap + ww_act > max_line_width:
+                lines.append(current_line)
+                current_line = []
+                current_width = 0
+            
+            if current_line:
+                current_width += word_gap
+            current_line.append((idx, w))
+            current_width += ww_act
+            
+        if current_line:
+            lines.append(current_line)
+            
+        # Tính toán tổng chiều cao và y_start
+        line_spacing = 25
+        total_height = 0
+        line_heights = []
+        for line in lines:
+            lh = max(word_sizes_active[idx][1] for idx, _ in line)
+            line_heights.append(lh)
+            total_height += lh
+        total_height += line_spacing * (len(lines) - 1)
+        
+        y_start = int(H * 0.45) - total_height // 2
+        
+        # Vẽ pill background đen mờ bao quanh toàn bộ text block
+        max_line_w_actual = 0
+        for line in lines:
+            lw = sum(word_sizes_active[idx][0] for idx, _ in line) + word_gap * (len(line) - 1)
+            if lw > max_line_w_actual:
+                max_line_w_actual = lw
+        
+        pill_padding_x = 45
+        pill_padding_y = 35
+        half_lw = int(max_line_w_actual) // 2
+        pill_x1 = W // 2 - half_lw - pill_padding_x
+        pill_y1 = y_start - pill_padding_y
+        pill_x2 = W // 2 + half_lw + pill_padding_x
+        pill_y2 = y_start + total_height + pill_padding_y
+        
+        overlay = PILImage.new("RGBA", img.size, (0, 0, 0, 0))
         ov_draw = ImageDraw.Draw(overlay)
-        r = 24  # border radius
         ov_draw.rounded_rectangle(
-            [box_x, box_y, box_x + box_w, box_y + box_h],
-            radius=r,
-            fill=(0, 0, 0, 175)
+            [pill_x1, pill_y1, pill_x2, pill_y2],
+            radius=25,
+            fill=(0, 0, 0, 150) # Semi-transparent black pill
         )
-        pil_img = PILImage.alpha_composite(pil_img.convert("RGBA"), overlay).convert("RGB")
-        draw = ImageDraw.Draw(pil_img)
-
-        # Vẽ từng dòng text
-        y_cursor = box_y + pad_y
-        for ln, (lw, lh) in zip(lines, line_bboxes):
-            x = (W - lw) // 2
-
-            # Stroke đen
-            sw = 4
-            for dx in range(-sw, sw + 1):
-                for dy in range(-sw, sw + 1):
-                    if dx * dx + dy * dy <= sw * sw:
-                        draw.text((x + dx, y_cursor + dy), ln, font=font, fill=(0, 0, 0))
-
-            # Chữ trắng chính
-            draw.text((x, y_cursor), ln, font=font, fill=(255, 255, 255))
-            y_cursor += lh + line_gap
-
-        return pil_img
+        img = PILImage.alpha_composite(img, overlay)
+        draw = ImageDraw.Draw(img)
+        
+        # Vẽ từng từ
+        y_cursor = y_start
+        for line_idx, line in enumerate(lines):
+            line_h = line_heights[line_idx]
+            line_w = sum(word_sizes_active[idx][0] for idx, _ in line) + word_gap * (len(line) - 1)
+            x_cursor = int((W - line_w) // 2)
+            
+            for idx, w_text in line:
+                ww_base, wh_base = word_sizes_base[idx]
+                ww_act, wh_act = word_sizes_active[idx]
+                
+                # Tâm của ô chứa từ này (tính theo kích thước active)
+                cx = x_cursor + ww_act // 2
+                cy = y_cursor + line_h // 2
+                
+                if idx == word_idx:
+                    # Active word: vẽ căn giữa ô bằng font_active
+                    draw_x = int(cx - ww_act / 2)
+                    draw_y = int(cy - wh_act / 2)
+                    
+                    # Viền chữ đen dày cho chữ active
+                    sw = 5
+                    for dx in range(-sw, sw + 1):
+                        for dy in range(-sw, sw + 1):
+                            if dx * dx + dy * dy <= sw * sw:
+                                draw.text((draw_x + dx, draw_y + dy), w_text, font=font_active, fill=(0, 0, 0))
+                    
+                    # Chữ chính màu vàng nổi bật
+                    draw.text((draw_x, draw_y), w_text, font=font_active, fill=(255, 223, 0))
+                else:
+                    # Inactive word: vẽ căn giữa ô bằng font_base
+                    draw_x = int(cx - ww_base / 2)
+                    draw_y = int(cy - wh_base / 2)
+                    
+                    # Viền chữ đen mỏng hơn
+                    sw = 3
+                    for dx in range(-sw, sw + 1):
+                        for dy in range(-sw, sw + 1):
+                            if dx * dx + dy * dy <= sw * sw:
+                                draw.text((draw_x + dx, draw_y + dy), w_text, font=font_base, fill=(0, 0, 0))
+                                
+                    # Chữ màu trắng
+                    draw.text((draw_x, draw_y), w_text, font=font_base, fill=(255, 255, 255))
+                
+                # Tiến tới từ tiếp theo (theo kích thước ô active để giữ nguyên khoảng cách)
+                x_cursor += ww_act + word_gap
+            
+            y_cursor += line_h + line_spacing
+        
+        return img.convert("RGB")
 
     def make_frame(t):
         idx = min(int(t / img_dur), len(scaled_imgs) - 1)
@@ -358,12 +441,9 @@ def create_shorts_from_images(
         crop = arr[top:top+crop_h, left:left+crop_w]
         pil  = Image.fromarray(crop).resize((W, H), Image.LANCZOS)
         
-        # Subtitle — trả về pil đã được vẽ subtitle
-        if subs:
-            for start, end, text in subs:
-                if start <= t <= end:
-                    pil = _add_phrase_subtitle(pil, text, W, H)
-                    break
+        # Subtitle — word-by-word highlight
+        if subtitle_phrases:
+            pil = _add_word_highlight_subtitle(pil, subtitle_phrases, t, W, H)
                     
         return np.array(pil)
 

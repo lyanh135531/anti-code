@@ -25,28 +25,63 @@ def generate_seo_metadata(topic_config: dict, script: str) -> dict:
     logger.info("Đang tạo SEO metadata (Pollinations)...")
 
     system = (
-        "You are a YouTube SEO expert specializing in Christian faith content. "
+        "You are a YouTube SEO expert specializing in Stoic philosophy content. "
         "You write compelling titles and descriptions that maximize click-through rates "
-        "for a Shorts channel dedicated to Jesus Christ and the Bible."
+        "for a Shorts channel dedicated to Stoicism and ancient wisdom. "
+        "You understand viral title formulas and know how to create curiosity gaps."
     )
 
-    prompt = f"""Generate SEO metadata for a YouTube Shorts video about Jesus Christ.
+    prompt = f"""Generate SEO metadata for a YouTube Shorts video about Stoicism.
 
 VIDEO TOPIC: {topic}
-BIBLE REFERENCE: {bible}
+PHILOSOPHER QUOTE: {bible}
 PRIMARY KEYWORDS: {', '.join(keywords)}
 CHANNEL: {CHANNEL_NAME}
+VIRAL PATTERN: {topic_config.get('viral_pattern', 'emotional_story')}
+CURIOUSITY GAP: {topic_config.get('curiosity_gap', '')}
 
 SCRIPT EXCERPT:
 {script[:1000]}
 
+═══════════════════════════════════════════════
+TITLE FORMULAS — Use ONE of these structures:
+═══════════════════════════════════════════════
+
+1. NUMBER + WISDOM + PROMISE:
+   "3 Stoic Rules That Will Change Your Life"
+   "5 Marcus Aurelius Quotes That Hit Different"
+
+2. QUESTION + INTRIGUE:
+   "Why Do Stoics Suppress Emotions? The Answer Will Surprise You"
+   "What Did Marcus Aurelius Fear Most?"
+
+3. CONTRARIAN + CURIOSITY:
+   "The Stoic Practice Most People Get Wrong"
+   "What Stoicism Teaches That Modern Psychology Ignores"
+
+4. EMOTIONAL TRIGGER + PROMISE:
+   "If You Can't Stop Overthinking, Watch This"
+   "When Life Feels Overwhelming, Remember This"
+
+5. STORY HOOK:
+   "A Soldier Used This Stoic Principle to Survive"
+   "He Lost Everything. Then He Read Marcus Aurelius."
+
+RULES:
+- Title MUST be 40-60 characters
+- Title MUST include the primary keyword (Stoic/Marcus Aurelius/Seneca/etc)
+- Title MUST create a curiosity gap (viewer wants to know more)
+- Title MUST NOT be clickbait that the content doesn't deliver on
+- NEVER use: "Something about X" or "X explained" — too boring
+- The title should match the viral pattern: {topic_config.get('viral_pattern', 'emotional_story')}
+
 Return ONLY a valid JSON object:
 {{
-  "title": "Compelling Shorts title, 50-70 chars, include primary keyword and emotional hook",
+  "title": "Compelling Shorts title, 40-60 chars, using one of the formulas above",
   "description": "YouTube description, 400-600 chars, with 3-5 relevant hashtags at end",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10", "tag11", "tag12", "tag13", "tag14", "tag15"],
-  "shorts_title": "Shorts title max 50 chars #Shorts",
-  "shorts_description": "Short description 100-200 chars with 3-4 hashtags #Shorts #Jesus #Bible"
+  "shorts_title": "Shorts title max 50 chars #Shorts, using formula",
+  "shorts_description": "Short description 100-200 chars with 3-4 hashtags #Shorts #Stoicism #Philosophy"
 }}"""
 
     try:
@@ -58,10 +93,23 @@ Return ONLY a valid JSON object:
         combined_tags = list(dict.fromkeys(all_tags + BASE_TAGS))[:35]
         metadata["tags"] = combined_tags
 
-        # Validate title length
+        # Validate title length (40-60 chars optimal for Shorts)
         title = metadata.get("title", topic)
+        if len(title) < 30 or len(title) > 70:
+            logger.warning(f"Title length suboptimal ({len(title)} chars): {title[:50]}...")
         if len(title) > 100:
             metadata["title"] = title[:97] + "..."
+
+        # Validate title has curiosity gap (not generic)
+        boring_patterns = ["something about", "explained", "what is ", "how to ", "everything about", "the truth about"]
+        if any(p in title.lower() for p in boring_patterns):
+            logger.warning(f"Title may be too generic/boring: {title}")
+
+        # Validate title contains primary keyword
+        primary_kw = keywords[0] if keywords else "stoic"
+        if primary_kw.lower() not in title.lower() and not any(kw in title.lower() for kw in ["marcus", "seneca", "epictetus", "philosophy", "wisdom", "mindset"]):
+            logger.warning(f"Title missing primary keyword '{primary_kw}': {title}")
+            metadata["title"] = f"{title[:45]} | {primary_kw.title()}"
 
         logger.info(f"✅ SEO OK | Title: {metadata.get('title', '')[:55]}")
         return metadata
