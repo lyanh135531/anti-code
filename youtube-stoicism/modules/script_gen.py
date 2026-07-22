@@ -1,15 +1,15 @@
 """
 ==========================================================
-  MODULE: SCRIPT GENERATOR — SHORTS ONLY (Pollinations AI)
+  MODULE: SCRIPT GENERATOR — SHORTS ONLY
   Tạo script YouTube Shorts 45-55 giây về Stoicism.
   Mỗi script gồm ĐÚNG 9 cảnh [SCENE: ...] với ảnh Philosophical/Stoic.
-  Dùng Pollinations AI thay thế Gemini — không bị 429!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
 import re
-from modules.pollinations_text import chat_complete
+from modules.ai_text import chat_complete
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def generate_shorts_script(topic_config: dict) -> dict:
     curiosity_gap = topic_config.get("curiosity_gap", "How does this apply to my life?")
     viral_pattern = topic_config.get("viral_pattern", "emotional_story")
 
-    logger.info(f"Đang tạo script Shorts (Pollinations): {topic}")
+    logger.info(f"Đang tạo script Shorts: {topic}")
 
     system = (
         "You are a YouTube Shorts scriptwriter and retention specialist for the channel 'Stoicism Mind'. "

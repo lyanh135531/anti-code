@@ -17,13 +17,17 @@ load_dotenv()
 # ============================================================
 # API KEYS - Điền vào đây hoặc dùng file .env
 # ============================================================
-# KEY DUY NHẤT CẦN THIẾT — Pollinations (text + image)
-POLLINATIONS_API_KEY = os.getenv("POLLINATIONS_API_KEY", "YOUR_POLLINATIONS_API_KEY")
-
-# Optional (không dùng trong pipeline hiện tại)
-GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY",   "")
-PEXELS_API_KEY   = os.getenv("PEXELS_API_KEY",   "")
-PIXABAY_API_KEY  = os.getenv("PIXABAY_API_KEY",  "")
+# AI providers
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.1-flash-lite").strip()
+CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+CLOUDFLARE_TEXT_MODEL = os.getenv(
+    "CLOUDFLARE_TEXT_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+).strip()
+CLOUDFLARE_IMAGE_MODEL = os.getenv(
+    "CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-2-klein-4b"
+).strip()
 
 # ============================================================
 # ĐƯỜNG DẪN THƯ MỤC
@@ -50,7 +54,7 @@ for d in [
 SHORTS_WIDTH      = 1080
 SHORTS_HEIGHT     = 1920
 SHORTS_FPS        = 24
-SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video (Pollinations limit = 10, giữ 1 dự phòng)
+SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video
 FADE_DURATION     = 0.5      # Giây fade chuyển cảnh
 
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
@@ -111,16 +115,7 @@ RELIGION_COLORS = {
 }
 
 # ============================================================
-# AI TEXT MODELS (Pollinations.ai) — MIỄN PHÍ, không quota
-# ============================================================
-# Thứ tự ưu tiên trong pollinations_text.py:
-#   openai → mistral → deepseek → claude-fast → openai-fast
-
-# ============================================================
-# AI IMAGE MODELS (Pollinations.ai) — tốn Pollen
-# ============================================================
-AI_IMAGE_MODEL = "flux"
-# Các model: "flux", "flux-schnell", "zimage", "flux-realism"
+# AI models are configured through environment variables above.
 
 # ============================================================
 # CHỦ ĐỀ VIDEO

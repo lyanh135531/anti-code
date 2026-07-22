@@ -12,7 +12,7 @@
     1. Tạo chủ đề Shorts về Chúa Jesus (AI)
     2. Tạo script 9 cảnh + SEO metadata (AI)
     3. Tạo giọng đọc (Edge TTS)
-    4. Tạo 9 ảnh Biblical (Pollinations Flux)
+    4. Tạo 9 ảnh bằng Cloudflare FLUX.2 Klein
     5. Dựng video Shorts 9:16 + Upload YouTube
 ==========================================================
 """
@@ -61,7 +61,7 @@ from config import (
 from modules.idea_gen          import generate_new_topic
 from modules.script_gen        import generate_shorts_script, save_script
 from modules.tts               import text_to_speech, get_audio_duration
-from modules.pollinations_image_gen import generate_shorts_images
+from modules.cloudflare_image_gen import generate_shorts_images
 from modules.shorts_maker      import create_shorts_from_images
 from modules.seo_optimizer     import generate_seo_metadata, format_description_for_youtube
 from modules.uploader          import upload_shorts, get_channel_info
@@ -168,8 +168,8 @@ def run_pipeline(
         results["errors"].append(f"TTS: {e}")
         return results
 
-    # ── BƯỚC 4: Tạo ảnh AI (Pollinations) ────────────────
-    logger.info(f"\n[4/5] 🎨 Tạo {SHORTS_MAX_IMAGES} ảnh Biblical (Pollinations Flux)...")
+    # ── BƯỚC 4: Tạo ảnh AI (Cloudflare) ──────────────────
+    logger.info(f"\n[4/5] 🎨 Tạo {SHORTS_MAX_IMAGES} ảnh bằng Cloudflare FLUX.2 Klein...")
     try:
         img_dir = OUTPUT_DIR / "images" / video_id
         img_dir.mkdir(parents=True, exist_ok=True)
@@ -187,7 +187,7 @@ def run_pipeline(
         )
 
         if not image_paths:
-            raise RuntimeError("Không tạo được ảnh nào! Kiểm tra Pollinations API key và số dư Pollen.")
+            raise RuntimeError("Không tạo được ảnh nào! Kiểm tra Cloudflare credentials và Workers AI quota.")
 
         logger.info(f"  ✅ Đã tạo {len(image_paths)}/{SHORTS_MAX_IMAGES} ảnh")
     except Exception as e:

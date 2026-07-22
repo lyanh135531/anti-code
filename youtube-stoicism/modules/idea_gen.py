@@ -1,13 +1,13 @@
 """
 ==========================================================
   MODULE: IDEA GENERATOR — SHORTS CHỦ ĐỀ STOICISM
-  Dùng Pollinations AI (không phải Gemini) — không bị 429!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
 import os
-from modules.pollinations_text import chat_complete, extract_json
+from modules.ai_text import chat_complete, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def generate_new_topic() -> dict:
     Sáng tạo một chủ đề Shorts mới về Stoicism và Triết học.
     Chủ đề PHẢI cụ thể, sâu sắc và trực tiếp liên quan đến Stoic Mindset.
     """
-    logger.info("Đang sáng tạo chủ đề Shorts về Stoicism (Pollinations)...")
+    logger.info("Đang sáng tạo chủ đề Shorts về Stoicism...")
 
     past_topics = _get_past_topics()
     history_str = "\n".join([f"- {t}" for t in past_topics]) if past_topics else "None yet."

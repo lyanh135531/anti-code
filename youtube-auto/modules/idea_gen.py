@@ -1,13 +1,13 @@
 """
 ==========================================================
   MODULE: IDEA GENERATOR — SHORTS CHỦ ĐỀ CHÚA JESUS
-  Dùng Pollinations AI (không phải Gemini) — không bị 429!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
 import os
-from modules.pollinations_text import chat_complete, extract_json
+from modules.ai_text import chat_complete, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -32,85 +32,108 @@ def generate_new_topic() -> dict:
     Sáng tạo một chủ đề Shorts mới về Chúa Jesus và Kinh Thánh.
     Chủ đề PHẢI cụ thể, xúc động và trực tiếp liên quan đến Jesus Christ.
     """
-    logger.info("Đang sáng tạo chủ đề Shorts về Chúa Jesus (Pollinations)...")
+    logger.info("Đang sáng tạo chủ đề Shorts về Chúa Jesus...")
 
     past_topics = _get_past_topics()
     history_str = "\n".join([f"- {t}" for t in past_topics]) if past_topics else "None yet."
 
     system = (
-        "You are a YouTube Shorts content strategist and viral topic specialist for a Christian channel called 'Spiritus' "
-        "dedicated EXCLUSIVELY to Jesus Christ, the Bible, and Christian faith. "
-        "Your job is to create emotionally powerful, faith-inspiring short video topics about JESUS CHRIST specifically. "
-        "You understand viral content patterns and know how to create curiosity gaps that make people STOP scrolling."
+        "You are the senior YouTube Shorts strategist for Spiritus, a Christian channel "
+        "about Jesus Christ and the Bible. You design truthful, emotionally resonant ideas "
+        "that earn attention through a precise human struggle, a credible open loop, and a "
+        "specific scriptural payoff. You never invent testimony, distort Scripture, use fearbait, "
+        "or promise a revelation the video cannot deliver. Write concise natural English for a "
+        "broad mobile audience."
     )
 
-    prompt = f"""Generate ONE new YouTube Shorts topic about JESUS CHRIST for the Spiritus channel.
+    prompt = f"""Create ONE high-retention YouTube Shorts concept about JESUS CHRIST for Spiritus.
 
 RECENTLY COVERED TOPICS (DO NOT duplicate):
 {history_str}
 
 ═══════════════════════════════════════════════
-VIRAL TOPIC PATTERNS — Choose ONE for this video:
+CHOOSE ONE RETENTION ANGLE:
 ═══════════════════════════════════════════════
 
-1. CONTRARIAN — "Most people believe X, but the truth is Y"
-   → "Most Christians skip this verse. It changes everything."
-   → "What Jesus said contradicts what most churches teach."
-
-2. HIDDEN KNOWLEDGE — "There's a secret about X nobody talks about"
-   → "The Bible verse that predicts modern events perfectly."
-   → "This hidden meaning in Scripture will amaze you."
-
-3. EMOTIONAL STORY — "A person was going through X when Y happened"
-   → "A soldier was dying when he read this one verse..."
-   → "She prayed for 10 years. Then this happened."
-
-4. TRANSFORMATION — "I used to think X, then I discovered Y"
-   → "I struggled with anxiety until I found this promise."
-   → "This one verse changed my entire perspective on life."
-
-5. SHOCKING FACT — "X will blow your mind"
-   → "Jesus said something that will give you chills."
-   → "This Bible fact is stranger than fiction."
-
-6. RELATABLE STRUGGLE — "If you're dealing with X, this is for you"
-   → "If you feel lost right now, God has a message for you."
-   → "When life gets hard, remember this promise."
+1. PARADOX — A teaching of Jesus sounds impossible until its meaning becomes clear.
+2. OVERLOOKED DETAIL — One small, verifiable detail in a Gospel scene changes its meaning.
+3. HUMAN CRISIS — Fear, grief, shame, loneliness, doubt, or waiting meets a specific teaching.
+4. QUESTION — Ask one emotionally urgent question that Scripture answers near the end.
+5. REFRAME — Replace a common but shallow interpretation with the passage's actual message.
+6. DIRECT ADDRESS — Speak to one viewer in one recognizable moment of struggle.
 
 ═══════════════════════════════════════════════
-STRICT REQUIREMENTS:
+RETENTION REQUIREMENTS:
 ═══════════════════════════════════════════════
 
-- The topic MUST specifically mention Jesus, Christ, God, the Bible, or a specific Bible event/verse.
-- Do NOT create generic "spirituality", "wisdom", or "meditation" topics.
-- Focus on: Jesus's miracles, His teachings, His love, His sacrifice, specific Bible stories, promises of God, His resurrection, answered prayers, His mercy and grace.
-- The hook must create URGENCY and EMOTION — make viewers stop scrolling.
-- The topic title MUST follow the chosen viral pattern structure.
+- Anchor the concept in ONE specific verse or Gospel event and preserve its real context.
+- Target ONE concrete viewer struggle; never use generic "life is hard" language.
+- Create ONE open question in the hook and give its complete answer in the payoff.
+- The hook must be 6-11 spoken words, immediately understandable, and address the viewer.
+- Start with tension, a paradox, or an unexpected image. Do not start with "Did you know", "Imagine", "Today", or "The Bible says".
+- The payoff must offer a useful spiritual reframe, not merely repeat the verse.
+- Avoid fabricated stories, vague miracles, prophecy claims, attacks on churches, and manipulative phrases such as "this will shock you" or "watch until the end".
+- Make the concept materially different from every recent topic above.
+- Plan a final, specific reflection question that viewers can answer in comments.
+
+VISUAL DIRECTION:
+- Every image will be a symbolic, semi-abstract oil painting.
+- Use indistinct human silhouettes, simplified forms, soft edges, visible impasto brushwork, atmospheric haze, and allegorical objects.
+- Every human figure must be faceless: show only distant back views, tiny silhouettes, cropped
+  bodies, or heads fully hidden by shadow, haze, cloth, or light. Never show identifiable eyes,
+  noses, mouths, facial contours, front-facing people, portraits, or close-ups.
+- Avoid photorealism, anime, crisp digital art, readable text, and literal close-ups.
+- Use a cohesive sunset palette: antique gold, amber, burnt orange, ochre, umber, and deep brown shadows.
 
 Return ONLY a valid JSON object:
 {{
-  "topic": "A viral Shorts title about Jesus (max 60 chars, MUST follow the chosen pattern)",
-  "viral_pattern": "contrarian|hidden_knowledge|emotional_story|transformation|shocking_fact|relatable_struggle",
-  "curiosity_gap": "The specific question the viewer will have after seeing the title/hook — what makes them NEED to watch until the end",
-  "keywords": ["jesus", "bible", "faith", "christianity", "god"],
-  "shorts_hook": "One explosive hook sentence to open the 50-second video (start with a Bible verse or shocking fact about Jesus)",
-  "visual_theme": "One sentence describing the overall visual style (e.g. 'Ancient Jerusalem scenes with divine golden light')",
-  "bible_reference": "One specific Bible verse (e.g. John 3:16)"
+  "topic": "Specific compelling title, 38-58 characters",
+  "viral_pattern": "paradox|overlooked_detail|human_crisis|question|reframe|direct_address",
+  "viewer_struggle": "One concrete emotional situation the viewer recognizes",
+  "curiosity_gap": "The single unanswered question created by the hook",
+  "revelation": "The accurate scriptural truth that answers the question",
+  "emotional_payoff": "How that truth changes the viewer's next thought or action",
+  "comment_question": "A short, specific reflection question tied to the message",
+  "keywords": ["five focused lowercase search terms"],
+  "shorts_hook": "A 6-11 word spoken hook with tension and an open loop",
+  "visual_theme": "Faceless distant silhouettes in symbolic semi-abstract oil paintings, thick brushwork, golden-orange sunset haze",
+  "bible_reference": "One specific and contextually accurate Bible reference"
 }}"""
 
     raw = chat_complete(prompt, system=system, temperature=0.9, json_mode=True)
     topic_config = extract_json(raw)
 
-    required = ["topic", "keywords", "shorts_hook", "visual_theme", "bible_reference", "viral_pattern", "curiosity_gap"]
+    required = [
+        "topic",
+        "keywords",
+        "shorts_hook",
+        "visual_theme",
+        "bible_reference",
+        "viral_pattern",
+        "viewer_struggle",
+        "curiosity_gap",
+        "revelation",
+        "emotional_payoff",
+        "comment_question",
+    ]
     for key in required:
         if key not in topic_config:
             raise ValueError(f"Missing key in topic response: '{key}'")
 
     # Validate viral_pattern value
-    valid_patterns = ["contrarian", "hidden_knowledge", "emotional_story", "transformation", "shocking_fact", "relatable_struggle"]
+    valid_patterns = [
+        "paradox",
+        "overlooked_detail",
+        "human_crisis",
+        "question",
+        "reframe",
+        "direct_address",
+    ]
     if topic_config["viral_pattern"] not in valid_patterns:
-        logger.warning(f"Unknown viral_pattern: {topic_config['viral_pattern']} — defaulting to 'emotional_story'")
-        topic_config["viral_pattern"] = "emotional_story"
+        logger.warning(
+            f"Unknown viral_pattern: {topic_config['viral_pattern']} — defaulting to 'human_crisis'"
+        )
+        topic_config["viral_pattern"] = "human_crisis"
 
     topic_config["religion"] = "Christianity"
     _save_topic_to_history(topic_config["topic"])

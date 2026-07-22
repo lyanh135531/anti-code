@@ -1,15 +1,15 @@
 """
 ==========================================================
-  MODULE: SCRIPT GENERATOR — SHORTS ONLY (Pollinations AI)
+  MODULE: SCRIPT GENERATOR — SHORTS ONLY
   Tạo script YouTube Shorts 45-55 giây về Chúa Jesus.
   Mỗi script gồm ĐÚNG 9 cảnh [SCENE: ...] với ảnh Kinh Thánh.
-  Dùng Pollinations AI thay thế Gemini — không bị 429!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
 import re
-from modules.pollinations_text import chat_complete
+from modules.ai_text import chat_complete
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +26,32 @@ def generate_shorts_script(topic_config: dict) -> dict:
     """
     topic        = topic_config["topic"]
     hook         = topic_config.get("shorts_hook", topic)
-    visual_theme = topic_config.get("visual_theme", "Ancient Jerusalem with divine golden light")
+    visual_theme = topic_config.get(
+        "visual_theme",
+        "Symbolic semi-abstract oil paintings in golden-orange sunset haze",
+    )
     bible_ref    = topic_config.get("bible_reference", "John 3:16")
     keywords     = topic_config.get("keywords", ["jesus", "bible", "faith"])
+    viewer_struggle = topic_config.get("viewer_struggle", "feeling unseen and alone")
     curiosity_gap = topic_config.get("curiosity_gap", "What does this mean for me?")
-    viral_pattern = topic_config.get("viral_pattern", "emotional_story")
+    revelation = topic_config.get("revelation", "Jesus meets people in their deepest need")
+    emotional_payoff = topic_config.get(
+        "emotional_payoff", "The viewer can take one faithful next step"
+    )
+    comment_question = topic_config.get(
+        "comment_question", "What do you need to trust God with today?"
+    )
+    viral_pattern = topic_config.get("viral_pattern", "human_crisis")
 
-    logger.info(f"Đang tạo script Shorts (Pollinations): {topic}")
+    logger.info(f"Đang tạo script Shorts: {topic}")
 
     system = (
-        "You are a YouTube Shorts scriptwriter and retention specialist for the channel 'Spiritus'. "
-        "You create emotionally powerful, faith-inspiring short scripts about Jesus Christ. "
-        "You always write in English and follow the exact format requested. "
-        "Your scripts are designed to MAXIMIZE viewer retention — every second must earn the viewer's attention."
+        "You are the lead writer and retention editor for Spiritus. You write accurate, "
+        "emotionally restrained Christian Shorts in natural spoken English. Every scene must "
+        "advance one story: tension, discovery, scriptural revelation, and personal resolution. "
+        "Use vivid concrete language, short rhythmic sentences, and second-person relevance. "
+        "Never fabricate testimony, misquote Scripture, use empty inspiration, or rely on "
+        "sensational clickbait. Follow the requested format exactly."
     )
 
     prompt = f"""Write a powerful, emotional 50-55 second YouTube Shorts script about Jesus Christ.
@@ -49,78 +62,86 @@ BIBLE VERSE: {bible_ref}
 VISUAL STYLE: {visual_theme}
 KEYWORDS: {', '.join(keywords)}
 
-CURIOUSITY GAP TO RESOLVE: {curiosity_gap}
+VIEWER'S REAL STRUGGLE: {viewer_struggle}
+OPEN QUESTION TO RESOLVE: {curiosity_gap}
+SCRIPTURAL REVELATION: {revelation}
+EMOTIONAL PAYOFF: {emotional_payoff}
+FINAL COMMENT QUESTION: {comment_question}
 VIRAL PATTERN: {viral_pattern}
-→ The script MUST make the viewer think "{curiosity_gap}" after the hook.
-→ The REVELATION segment MUST directly answer this question.
-→ This is the #1 reason viewers will watch until the end.
+
+The hook must make the viewer silently ask: "{curiosity_gap}"
+Scenes 2-6 must delay—but continually earn—the answer with new information.
+Scenes 7-8 must answer it clearly through {bible_ref} and connect it to the viewer's struggle.
 
 ═══════════════════════════════════════════════
 RETENTION STRUCTURE — Follow this EXACT arc:
 ═══════════════════════════════════════════════
 
 [HOOK — 0 to 3 seconds]
-Purpose: STOP the scroll. Create curiosity or emotional shock.
-The viewer should think "wait what?" and MUST keep watching.
-Rule: Open with the hook line directly. NO warm-up. NO "today we talk about..."
+Use the supplied hook or improve it. Deliver 4-8 sharp words before any context.
+Create tension without exaggeration. No greetings, setup, quotation label, or warm-up.
 
 [SETUP — 3 to 10 seconds]
-Purpose: Create an information gap. Hint something surprising is coming.
-Rule: 10-15 words MAX. Give just enough context to set up the revelation.
+Place the viewer inside one concrete emotional moment. Withhold the answer.
 
 [RISING TENSION — 10 to 25 seconds]
-Purpose: Build curiosity progressively. Each scene adds a new layer.
-Rule: Each scene makes the viewer think "but what about...?" or "hmm interesting..."
-Vary pacing: mix 3-word punchy lines with longer reflection lines.
+Add one new fact, contrast, or consequence per scene. Never paraphrase the previous line.
+End at least two lines with an unresolved implication that naturally pulls forward.
 
 [REVELATION/TWIST — 25 to 40 seconds]
-Purpose: The "AHA!" moment. This is where retention peaks.
-Rule: Deliver the surprising truth, the emotional punch, or hidden knowledge.
-Make it COUNT — this is the reason viewers watch until the end.
+Answer the exact open question with the passage's real meaning.
+If quoting Scripture, use only a short accurate excerpt; otherwise paraphrase faithfully.
 
 [PAYOFF — 40 to 50 seconds]
-Purpose: Emotional resolution. Connect back to the viewer's life.
-Rule: Make them feel something deep. Connect the Bible truth to their daily struggle.
+Echo an image or phrase from the hook. Give one specific reframe or next action.
 
 [CTA — Last 3-5 seconds]
-Purpose: Drive engagement without being pushy.
-Rule: 10 words max. "Follow for more" or "Share if this touched your heart."
+Ask the supplied reflection question in 10 words or fewer. It should invite an honest comment,
+not a forced declaration. A subtle follow prompt is optional.
 
 ═══════════════════════════════════════════════
 STRICT RULES:
 ═══════════════════════════════════════════════
 
-1. Write EXACTLY 9 scenes using format: [SCENE: description]
-2. Total spoken words: 70-85 words (this is CRITICAL — must be under 58 seconds)
-3. Each spoken line: 5-12 words. NO long sentences. Vary length for pacing.
-4. Each [SCENE: ...] MUST describe a SPECIFIC Biblical/Christian visual in ANIME/PAINTING style.
+1. Write EXACTLY 9 scenes in this order:
+   HOOK, SETUP, RISING, RISING, RISING, REVELATION, REVELATION, PAYOFF, CTA.
+2. Total spoken words: 70-85. Count only spoken lines.
+3. Use one spoken line per scene, normally 5-11 words. Mix short punches with flowing lines.
+4. Use simple conversational English. Prefer concrete nouns and active verbs.
+5. Do not repeat the hook, verse, lesson, or emotional claim in different words.
+6. Do not use clichés such as "everything happens for a reason", "you needed to hear this",
+   "God is saying", "this changes everything", or "let that sink in".
+7. The message must be theologically responsible and supported by {bible_ref}.
 
-   FACE RULES — VERY IMPORTANT:
-   ❌ NEVER write "close-up face of Jesus/person" — this causes AI face distortions
-   ✅ INSTEAD use: wide shots, silhouettes, back views, hands only, symbolic objects, landscapes
+VISUAL RULES FOR EVERY [SCENE-...: description]:
+- Describe one distinct symbolic composition, not a literal illustration of the spoken line.
+- Style: semi-abstract figurative oil painting on textured canvas, loose impasto brushwork,
+  indistinct simplified forms, soft blurred edges, atmospheric haze, dreamlike allegory.
+- Palette: antique gold, amber, burnt orange, ochre, sienna, umber, and deep brown shadows;
+  light should feel like the final minutes of sunset.
+- FACELESS PEOPLE IS A HARD REQUIREMENT FOR ALL NINE SCENES. Show people only as distant back
+  views, tiny silhouettes, cropped bodies, or heads fully hidden by shadow, haze, cloth, or light.
+- Do not describe or show identifiable eyes, noses, mouths, skin detail, facial contours,
+  front-facing people, portraits, headshots, close-ups, or three-quarter facial views.
+- Jesus may appear only from behind as a distant featureless silhouette, or as a symbolic
+  presence represented by light, a doorway, bread, a cross, or an empty path.
+- Use negative space and one strong symbol per frame: doorway, path, lamp, cross, boat, bread,
+  empty tomb, storm, olive tree, hands, or a small figure beneath a vast sky.
+- Maintain one recurring visual motif across all nine scenes for continuity, but vary composition.
+- Never request anime, Studio Ghibli, photorealism, sharp digital rendering, readable text,
+  facial features, glossy 3D, neon colors, blue-dominant lighting, or clutter.
 
-   GOOD examples:
-   ✅ "Silhouette of Jesus with arms open on a hilltop at sunset, anime painting style, golden sky"
-   ✅ "Hands of Jesus gently touching an open Bible, warm candlelight, Studio Ghibli style"
-   ✅ "Ancient Jerusalem skyline at dusk, anime art style, warm amber tones, cross on a hill"
-   ✅ "A glowing dove descending from heaven through golden clouds, anime painting"
-   ✅ "Open Bible with John 3:16 glowing softly, ethereal light, cinematic painting"
-   ✅ "A wooden cross on a hilltop, dramatic sunset, anime cinematic style"
-   ✅ "Person kneeling in prayer in silhouette inside a cathedral, golden light rays"
-
-   BAD examples:
-   ❌ "Close-up of Jesus's face filled with compassion"
-   ❌ "Realistic portrait of a man looking at camera"
-   ❌ "Photorealistic face of a grieving woman"
-
-5. Label each scene with its purpose: [SCENE-HOOK], [SCENE-SETUP], [SCENE-RISING], [SCENE-REVELATION], [SCENE-PAYOFF], [SCENE-CTA]
-   (First scene = HOOK, second = SETUP, middle scenes = RISING/REVELATION, second-to-last = PAYOFF, last = CTA)
-6. Tone: awe-inspiring, warm, faith-building
+GOOD VISUAL EXAMPLES:
+- "A lone indistinct figure before a narrow doorway of amber light, semi-abstract oil painting,
+   thick ochre brushstrokes, smoky sunset haze, vast dark negative space"
+- "A small wooden boat reduced to rough shapes beneath a burnt-orange storm sky, symbolic oil
+   painting, blurred edges, golden light breaking through umber clouds"
+- "The silhouette of Jesus seen from behind on a ridge, form dissolving into antique-gold light,
+   allegorical oil painting, textured canvas, quiet sienna shadows"
 
 EXACT FORMAT (repeat 9 times):
-[SCENE-XXX: specific Biblical/Christian visual prompt, include camera direction if helpful]
-"Spoken line 5-12 words"
-"Second line if needed"
+[SCENE-XXX: one symbolic faceless oil-painting composition following all visual rules]
+"One spoken line"
 
 Write the complete script now:"""
 
@@ -128,8 +149,10 @@ Write the complete script now:"""
 
     # Validate scene count
     scene_count = len(re.findall(r'\[SCENE', raw_script))
-    if scene_count < 5:
-        raise ValueError(f"Too few scenes generated: {scene_count}/{SHORTS_SCENES_COUNT}")
+    if scene_count != SHORTS_SCENES_COUNT:
+        raise ValueError(
+            f"Expected exactly {SHORTS_SCENES_COUNT} scenes, received {scene_count}"
+        )
 
     # Validate emotional arc labels exist
     required_labels = ['SCENE-HOOK', 'SCENE-SETUP']

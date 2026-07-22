@@ -1,14 +1,14 @@
 """
 ==========================================================
-  MODULE: SEO OPTIMIZER (Pollinations AI)
+  MODULE: SEO OPTIMIZER
   Tạo title, description, tags tối ưu SEO cho YouTube Shorts.
-  Dùng Pollinations AI — không bị 429 quota!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
 import json
-from modules.pollinations_text import chat_complete, extract_json
+from modules.ai_text import chat_complete, extract_json
 from config import BASE_TAGS, CHANNEL_NAME
 
 logger = logging.getLogger(__name__)
@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 def generate_seo_metadata(topic_config: dict, script: str) -> dict:
     """
-    Tạo SEO metadata cho YouTube Shorts bằng Pollinations AI.
+    Tạo SEO metadata cho YouTube Shorts bằng AI.
     """
     topic    = topic_config["topic"]
     keywords = topic_config.get("keywords", [])
-    bible    = topic_config.get("bible_reference", "")
+    quote    = topic_config.get("philosopher_quote", "")
 
-    logger.info("Đang tạo SEO metadata (Pollinations)...")
+    logger.info("Đang tạo SEO metadata...")
 
     system = (
         "You are a YouTube SEO expert specializing in Stoic philosophy content. "
@@ -34,7 +34,7 @@ def generate_seo_metadata(topic_config: dict, script: str) -> dict:
     prompt = f"""Generate SEO metadata for a YouTube Shorts video about Stoicism.
 
 VIDEO TOPIC: {topic}
-PHILOSOPHER QUOTE: {bible}
+PHILOSOPHER QUOTE: {quote}
 PRIMARY KEYWORDS: {', '.join(keywords)}
 CHANNEL: {CHANNEL_NAME}
 VIRAL PATTERN: {topic_config.get('viral_pattern', 'emotional_story')}
@@ -123,16 +123,16 @@ def _fallback_metadata(topic_config: dict) -> dict:
     """Metadata cơ bản nếu API thất bại."""
     topic    = topic_config["topic"]
     keywords = topic_config.get("keywords", [])
-    bible    = topic_config.get("bible_reference", "")
+    quote    = topic_config.get("philosopher_quote", "")
 
     title = f"{topic} | {CHANNEL_NAME}"[:100]
-    kw    = keywords[0].title() if keywords else "Jesus"
+    kw    = keywords[0].title() if keywords else "Stoicism"
 
     description = (
-        f"✝️ {topic}\n\n"
-        f"{bible} — Discover the power of God's Word in 60 seconds.\n\n"
-        f"Follow @{CHANNEL_NAME} for daily Scripture and inspiration.\n\n"
-        f"#Jesus #Bible #Christianity #Faith #Shorts"
+        f"🏛️ {topic}\n\n"
+        f"{quote} — Practical Stoic wisdom in 60 seconds.\n\n"
+        f"Follow @{CHANNEL_NAME} for daily philosophy and discipline.\n\n"
+        f"#Stoicism #Philosophy #Mindset #Wisdom #Shorts"
     )
 
     tags = list(dict.fromkeys(keywords + BASE_TAGS))[:35]
@@ -142,7 +142,7 @@ def _fallback_metadata(topic_config: dict) -> dict:
         "description":        description,
         "tags":               tags,
         "shorts_title":       f"{topic[:45]} #Shorts",
-        "shorts_description": f"✝️ {kw} in 60 seconds! {bible} #Shorts #Jesus #Bible #Faith",
+        "shorts_description": f"🏛️ {kw} in 60 seconds! {quote} #Shorts #Stoicism #Philosophy",
     }
 
 

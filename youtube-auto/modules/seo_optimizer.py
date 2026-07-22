@@ -1,14 +1,13 @@
 """
 ==========================================================
-  MODULE: SEO OPTIMIZER (Pollinations AI)
+  MODULE: SEO OPTIMIZER
   Tạo title, description, tags tối ưu SEO cho YouTube Shorts.
-  Dùng Pollinations AI — không bị 429 quota!
+  Dùng Gemini với Cloudflare Workers AI làm fallback.
 ==========================================================
 """
 
 import logging
-import json
-from modules.pollinations_text import chat_complete, extract_json
+from modules.ai_text import chat_complete, extract_json
 from config import BASE_TAGS, CHANNEL_NAME
 
 logger = logging.getLogger(__name__)
@@ -16,19 +15,24 @@ logger = logging.getLogger(__name__)
 
 def generate_seo_metadata(topic_config: dict, script: str) -> dict:
     """
-    Tạo SEO metadata cho YouTube Shorts bằng Pollinations AI.
+    Tạo SEO metadata cho YouTube Shorts bằng AI.
     """
     topic    = topic_config["topic"]
     keywords = topic_config.get("keywords", [])
     bible    = topic_config.get("bible_reference", "")
+    viewer_struggle = topic_config.get("viewer_struggle", "")
+    revelation = topic_config.get("revelation", "")
+    emotional_payoff = topic_config.get("emotional_payoff", "")
+    comment_question = topic_config.get("comment_question", "")
 
-    logger.info("Đang tạo SEO metadata (Pollinations)...")
+    logger.info("Đang tạo SEO metadata...")
 
     system = (
-        "You are a YouTube SEO expert specializing in Christian faith content. "
-        "You write compelling titles and descriptions that maximize click-through rates "
-        "for a Shorts channel dedicated to Jesus Christ and the Bible. "
-        "You understand viral title formulas and know how to create curiosity gaps."
+        "You are the packaging editor for Spiritus, a Christian YouTube Shorts channel. "
+        "Create truthful, specific metadata that earns the click by naming a real emotional "
+        "tension and promising the exact scriptural insight delivered in the video. Write in "
+        "natural English for people, not search engines. Never fabricate testimony, attack "
+        "churches, exploit fear, or make a promise the script cannot fulfill."
     )
 
     prompt = f"""Generate SEO metadata for a YouTube Shorts video about Jesus Christ.
@@ -37,51 +41,66 @@ VIDEO TOPIC: {topic}
 BIBLE REFERENCE: {bible}
 PRIMARY KEYWORDS: {', '.join(keywords)}
 CHANNEL: {CHANNEL_NAME}
-VIRAL PATTERN: {topic_config.get('viral_pattern', 'emotional_story')}
-CURIOUSITY GAP: {topic_config.get('curiosity_gap', '')}
+VIRAL PATTERN: {topic_config.get('viral_pattern', 'human_crisis')}
+CURIOSITY GAP: {topic_config.get('curiosity_gap', '')}
+VIEWER'S STRUGGLE: {viewer_struggle}
+SCRIPTURAL REVELATION: {revelation}
+EMOTIONAL PAYOFF: {emotional_payoff}
+COMMENT QUESTION: {comment_question}
 
 SCRIPT EXCERPT:
 {script[:1000]}
 
 ═══════════════════════════════════════════════
-TITLE FORMULAS — Use ONE of these structures:
+TITLE DIRECTIONS — Choose the one that best fits this script:
 ═══════════════════════════════════════════════
 
-1. NUMBER + EMOTION + PROMISE:
-   "3 Verses That Will Change Your Life Tonight"
-   "5 Things Jesus Said That Will Give You Chills"
+1. PARADOX:
+   "Jesus Was Silent—But He Hadn't Left"
 
-2. QUESTION + INTRIGUE:
-   "Why Does Jesus Weep? The Answer Will Move You"
-   "What Did Jesus Say About Your Struggle?"
+2. HUMAN QUESTION:
+   "Why Did Jesus Weep If He Knew the Ending?"
 
-3. CONTRARIAN + CURIOSITY:
-   "The Bible Verse Most Christians Get Wrong"
-   "What Churches Don't Tell You About This Verse"
+3. OVERLOOKED DETAIL:
+   "The Detail Everyone Misses in This Jesus Story"
 
-4. EMOTIONAL TRIGGER + PROMISE:
-   "If You're Hurting, This Verse Is For You"
-   "When Life Gets Hard, Remember This Promise"
+4. PERSONAL REFRAME:
+   "When God Feels Silent, Remember This Moment"
 
-5. STORY HOOK:
-   "A Soldier Was Dying When He Read This Verse"
-   "She Prayed for 10 Years. Then This Happened."
+5. CONCRETE STORY TENSION:
+   "Peter Was Sinking. Jesus Asked One Question"
 
 RULES:
-- Title MUST be 40-60 characters
-- Title MUST include the primary keyword (Jesus/Bible/God/etc)
-- Title MUST create a curiosity gap (viewer wants to know more)
-- Title MUST NOT be clickbait that the content doesn't deliver on
-- NEVER use: "Something about X" or "X explained" — too boring
-- The title should match the viral pattern: {topic_config.get('viral_pattern', 'emotional_story')}
+- Write the title for a scrolling viewer, not as a sermon heading.
+- Keep it 38-58 characters and place the tension in the first 35 characters.
+- Include one natural faith keyword such as Jesus, God, Bible, or Scripture.
+- Open one curiosity gap and preserve the video's answer; do not summarize the whole lesson.
+- Use concrete nouns and active verbs. Make the viewer feel personally implicated.
+- Use title case, no ALL CAPS, no emoji, and at most one punctuation mark.
+- Match this viral pattern: {topic_config.get('viral_pattern', 'human_crisis')}.
+- Never use fabricated personal stories, fear, prophecy, guilt, or controversy.
+- Never use generic bait such as "will give you chills", "you need to hear this",
+  "watch before it's too late", "God is telling you", "this changes everything",
+  "most Christians get this wrong", or "what churches won't tell you".
+
+DESCRIPTION RULES:
+- Start with a 7-12 word continuation of the hook, without giving away the revelation.
+- In 2-3 short sentences, name the struggle, the passage, and the useful takeaway.
+- End with the supplied honest reflection question, then 3-5 precise hashtags.
+- Keep the full description between 250 and 450 characters.
+- Do not repeat the title, keyword-stuff, preach at the viewer, or add unsupported claims.
+
+SHORTS FIELD RULES:
+- shorts_title is the same core title, tightened to fit 50 characters including #Shorts.
+- shorts_description is 100-180 characters and retains the reflection question.
 
 Return ONLY a valid JSON object:
 {{
-  "title": "Compelling Shorts title, 40-60 chars, using one of the formulas above",
-  "description": "YouTube description, 400-600 chars, with 3-5 relevant hashtags at end",
+  "title": "Truthful, specific title following every rule above",
+  "description": "Hook continuation, useful context, reflection question, then 3-5 hashtags",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10", "tag11", "tag12", "tag13", "tag14", "tag15"],
-  "shorts_title": "Shorts title max 50 chars #Shorts, using formula",
-  "shorts_description": "Short description 100-200 chars with 3-4 hashtags #Shorts #Jesus #Bible"
+  "shorts_title": "Core title plus #Shorts, 50 characters maximum",
+  "shorts_description": "Concise description with reflection question and 3-4 hashtags"
 }}"""
 
     try:
@@ -101,7 +120,17 @@ Return ONLY a valid JSON object:
             metadata["title"] = title[:97] + "..."
 
         # Validate title has curiosity gap (not generic)
-        boring_patterns = ["something about", "explained", "what is ", "how to ", "everything about", "the truth about"]
+        boring_patterns = [
+            "something about",
+            "explained",
+            "what is ",
+            "how to ",
+            "everything about",
+            "the truth about",
+            "you need to hear this",
+            "will give you chills",
+            "what churches won't tell you",
+        ]
         if any(p in title.lower() for p in boring_patterns):
             logger.warning(f"Title may be too generic/boring: {title}")
 

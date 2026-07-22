@@ -12,6 +12,7 @@
 import schedule
 import time
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +40,6 @@ logger = logging.getLogger("scheduler")
 # Video sẽ được lên lịch đăng lúc PUBLISH_HOUR
 PIPELINE_RUN_HOUR  = "17:00"   # 5 giờ chiều tạo video
 PUBLISH_HOUR       = 19        # 7 giờ tối đăng lên YouTube
-CREATE_SHORTS      = True      # Tạo Shorts kèm theo
 UPLOAD_IMMEDIATELY = False     # False = lên lịch, True = đăng ngay
 
 
@@ -51,15 +51,14 @@ def run_daily_pipeline():
         from main import run_pipeline
         results = run_pipeline(
             upload        = True,
-            make_shorts   = CREATE_SHORTS,
             dry_run       = False,
             schedule_hour = PUBLISH_HOUR if not UPLOAD_IMMEDIATELY else None,
         )
 
         if results["success"]:
             logger.info("✅ Pipeline hàng ngày hoàn thành!")
-            if results.get("video_id"):
-                logger.info(f"   Video ID: {results['video_id']}")
+            if results.get("shorts_id"):
+                logger.info(f"   YouTube Shorts ID: {results['shorts_id']}")
         else:
             logger.error("❌ Pipeline thất bại!")
             if results.get("errors"):
@@ -81,7 +80,6 @@ def main():
     schedule.every().day.at(PIPELINE_RUN_HOUR).do(run_daily_pipeline)
 
     # Tùy chọn: Chạy ngay lần đầu khi khởi động scheduler
-    import os
     if os.getenv("RUN_NOW", "").lower() == "true":
         logger.info("RUN_NOW=true → Chạy pipeline ngay...")
         run_daily_pipeline()

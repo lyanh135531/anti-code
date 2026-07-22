@@ -1,7 +1,7 @@
 """
 ==========================================================
-  SPIRITUS — YOUTUBE SHORTS AUTO PIPELINE
-  Tự động tạo YouTube Shorts về Chúa Jesus / Kinh Thánh
+  STOICISM MIND — YOUTUBE SHORTS AUTO PIPELINE
+  Tự động tạo YouTube Shorts về Stoicism
 
   Chạy:
     python main.py            # Tạo + upload Shorts
@@ -9,10 +9,10 @@
     python main.py --schedule 18  # Lên lịch đăng lúc 18:00
 
   Pipeline (5 bước):
-    1. Tạo chủ đề Shorts về Chúa Jesus (AI)
+    1. Tạo chủ đề Shorts về Stoicism (AI)
     2. Tạo script 9 cảnh + SEO metadata (AI)
     3. Tạo giọng đọc (Edge TTS)
-    4. Tạo 9 ảnh Biblical (Pollinations Flux)
+    4. Tạo 9 ảnh bằng Cloudflare FLUX.2 Klein
     5. Dựng video Shorts 9:16 + Upload YouTube
 ==========================================================
 """
@@ -61,7 +61,7 @@ from config import (
 from modules.idea_gen          import generate_new_topic
 from modules.script_gen        import generate_shorts_script, save_script
 from modules.tts               import text_to_speech, get_audio_duration
-from modules.pollinations_image_gen import generate_shorts_images
+from modules.cloudflare_image_gen import generate_shorts_images
 from modules.shorts_maker      import create_shorts_from_images
 from modules.seo_optimizer     import generate_seo_metadata, format_description_for_youtube
 from modules.uploader          import upload_shorts, get_channel_info
@@ -104,13 +104,13 @@ def run_pipeline(
     }
 
     logger.info("=" * 60)
-    logger.info("  ✝️  SPIRITUS — SHORTS PIPELINE BẮT ĐẦU")
+    logger.info("  🏛️  STOICISM MIND — SHORTS PIPELINE BẮT ĐẦU")
     logger.info("=" * 60)
 
     video_id = _generate_video_id()
 
     # ── BƯỚC 1: Tạo chủ đề ───────────────────────────────
-    logger.info("\n[1/5] 💡 Tạo chủ đề về Chúa Jesus...")
+    logger.info("\n[1/5] 💡 Tạo chủ đề về Stoicism...")
     try:
         topic_config = generate_new_topic()
         logger.info(f"  ✅ Topic: {topic_config['topic']}")
@@ -168,8 +168,8 @@ def run_pipeline(
         results["errors"].append(f"TTS: {e}")
         return results
 
-    # ── BƯỚC 4: Tạo ảnh AI (Pollinations) ────────────────
-    logger.info(f"\n[4/5] 🎨 Tạo {SHORTS_MAX_IMAGES} ảnh Biblical (Pollinations Flux)...")
+    # ── BƯỚC 4: Tạo ảnh AI (Cloudflare) ──────────────────
+    logger.info(f"\n[4/5] 🎨 Tạo {SHORTS_MAX_IMAGES} ảnh bằng Cloudflare FLUX.2 Klein...")
     try:
         img_dir = OUTPUT_DIR / "images" / video_id
         img_dir.mkdir(parents=True, exist_ok=True)
@@ -187,7 +187,7 @@ def run_pipeline(
         )
 
         if not image_paths:
-            raise RuntimeError("Không tạo được ảnh nào! Kiểm tra Pollinations API key và số dư Pollen.")
+            raise RuntimeError("Không tạo được ảnh nào! Kiểm tra Cloudflare credentials và Workers AI quota.")
 
         logger.info(f"  ✅ Đã tạo {len(image_paths)}/{SHORTS_MAX_IMAGES} ảnh")
     except Exception as e:
@@ -261,8 +261,8 @@ def run_pipeline(
     logger.info("\n" + "=" * 60)
     logger.info("  📊 KẾT QUẢ")
     logger.info("=" * 60)
-    logger.info(f"  ✝️  Topic: {topic_config['topic'][:60]}")
-    logger.info(f"  📖 Kinh Thánh: {script_data.get('bible_reference', 'N/A')}")
+    logger.info(f"  🏛️  Topic: {topic_config['topic'][:60]}")
+    logger.info(f"  📜 Trích dẫn: {script_data.get('bible_reference', 'N/A')}")
     logger.info(f"  🎥 Shorts: {results['shorts_path']}")
     logger.info(f"  🆔 YouTube ID: {results['shorts_id'] or 'Chưa upload'}")
     logger.info(f"  ⏱️  Tổng thời gian: {elapsed/60:.1f} phút")
@@ -289,7 +289,7 @@ def run_pipeline(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="✝️  Spiritus — YouTube Shorts Auto Pipeline (Jesus / Christianity)",
+        description="🏛️  Stoicism Mind — YouTube Shorts Auto Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
