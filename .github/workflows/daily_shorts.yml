@@ -50,7 +50,8 @@ jobs:
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
           YOUTUBE_TOKEN_BASE64: ${{ secrets.YOUTUBE_TOKEN_BASE64 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Thêm các biến khác nếu cần
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
             python main.py --dry-run
