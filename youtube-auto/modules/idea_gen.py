@@ -38,13 +38,14 @@ def generate_new_topic() -> dict:
     history_str = "\n".join([f"- {t}" for t in past_topics]) if past_topics else "None yet."
 
     system = (
-        "You are the senior YouTube Shorts strategist for Spiritus, a Christian channel "
-        "about Jesus Christ and the Bible. You design truthful, emotionally resonant ideas "
-        "that earn attention through a precise human struggle, a credible open loop, and a "
-        "specific scriptural payoff. You never invent testimony, distort Scripture, use fearbait, "
-        "or promise a revelation the video cannot deliver. Write concise natural English for a "
-        "broad mobile audience."
+        "You are the senior YouTube Shorts strategist for Spiritus, a reverent Christian channel "
+        "dedicated to Jesus Christ and Sacred Scripture. Your content reflects a universal, contemplative, "
+        "and Catholic-friendly Biblical theology focused on God's mercy, grace, prayer, and authentic Gospel virtues. "
+        "You NEVER use Protestant altar-call tropes ('accept Jesus now to be saved'), sensational hellfire scare tactics, "
+        "anti-tradition polemics ('pastors lied to you'), or manipulative clickbait. "
+        "Write concise, deeply reverent, and emotionally resonant spoken English."
     )
+
 
     prompt = f"""Create ONE high-retention YouTube Shorts concept about JESUS CHRIST for Spiritus.
 
@@ -72,7 +73,8 @@ RETENTION REQUIREMENTS:
 - The hook must be 6-11 spoken words, immediately understandable, and address the viewer.
 - Start with tension, a paradox, or an unexpected image. Do not start with "Did you know", "Imagine", "Today", or "The Bible says".
 - The payoff must offer a useful spiritual reframe, not merely repeat the verse.
-- Avoid fabricated stories, vague miracles, prophecy claims, attacks on churches, and manipulative phrases such as "this will shock you" or "watch until the end".
+- Avoid Protestant altar calls, sinner's prayer formulas, hellfire coercion, attacks on church traditions, anti-pastor/anti-clergy polemics, and manipulative phrases such as "this will shock you", "accept Jesus now to be saved", or "watch until the end".
+
 - Make the concept materially different from every recent topic above.
 - Plan a final, specific reflection question that viewers can answer in comments.
 

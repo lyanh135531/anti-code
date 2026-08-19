@@ -119,6 +119,13 @@ RELIGION_COLORS = {
 # AI models are configured through environment variables above.
 
 # ============================================================
+# PHONG CÁCH TẠO ẢNH (IMAGE STYLE PRESETS)
+# Options: "renaissance", "cinematic", "digital_art", "abstract_oil"
+# ============================================================
+IMAGE_STYLE_PRESET = os.getenv("IMAGE_STYLE_PRESET", "renaissance").strip()
+
+# ============================================================
 # CHỦ ĐỀ VIDEO
 # ============================================================
 TARGET_RELIGION = "Christianity"
+

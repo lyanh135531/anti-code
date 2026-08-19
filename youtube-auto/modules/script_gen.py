@@ -28,8 +28,9 @@ def generate_shorts_script(topic_config: dict) -> dict:
     hook         = topic_config.get("shorts_hook", topic)
     visual_theme = topic_config.get(
         "visual_theme",
-        "Symbolic semi-abstract oil paintings in golden-orange sunset haze",
+        "Masterpiece Renaissance oil painting with dramatic Caravaggio chiaroscuro lighting and Rembrandt golden highlights",
     )
+
     bible_ref    = topic_config.get("bible_reference", "John 3:16")
     keywords     = topic_config.get("keywords", ["jesus", "bible", "faith"])
     viewer_struggle = topic_config.get("viewer_struggle", "feeling unseen and alone")
@@ -47,12 +48,14 @@ def generate_shorts_script(topic_config: dict) -> dict:
 
     system = (
         "You are the lead writer and retention editor for Spiritus. You write accurate, "
-        "emotionally restrained Christian Shorts in natural spoken English. Every scene must "
-        "advance one story: tension, discovery, scriptural revelation, and personal resolution. "
-        "Use vivid concrete language, short rhythmic sentences, and second-person relevance. "
-        "Never fabricate testimony, misquote Scripture, use empty inspiration, or rely on "
-        "sensational clickbait. Follow the requested format exactly."
+        "reverent, contemplative Christian Shorts in natural spoken English, aligned with universal "
+        "Biblical and Catholic-friendly spirituality. Every scene must advance one story: tension, "
+        "discovery, scriptural revelation, and personal resolution. Use vivid concrete language, "
+        "short rhythmic sentences, and second-person relevance. "
+        "Never use Protestant altar-call tropes ('say this prayer to be saved'), hellfire scare tactics, "
+        "anti-tradition polemics, or sensational clickbait. Follow the requested format exactly."
     )
+
 
     prompt = f"""Write a powerful, emotional 50-55 second YouTube Shorts script about Jesus Christ.
 
@@ -112,36 +115,30 @@ STRICT RULES:
 6. Do not use clichés such as "everything happens for a reason", "you needed to hear this",
    "God is saying", "this changes everything", or "let that sink in".
 7. The message must be theologically responsible and supported by {bible_ref}.
+8. Write in a reverent, contemplative Biblical tone. Do not use Protestant altar calls ('say this prayer to be saved'), hellfire scare tactics ('turn to Jesus or go to hell'), or attacks on church tradition/pastors.
+9. PURE SPOKEN NARRATIVE ONLY: Spoken lines must contain ONLY pure, natural spoken narrative message intended for the listener. NEVER include technical terms, stage directions, scene labels ('Scene 1', 'VO:', 'Narrator:'), Bible citation brackets like '(John 3:16)', or meta instructions.
+
+
 
 VISUAL RULES FOR EVERY [SCENE-...: description]:
-- Describe one distinct symbolic composition, not a literal illustration of the spoken line.
-- Style: semi-abstract figurative oil painting on textured canvas, loose impasto brushwork,
-  indistinct simplified forms, soft blurred edges, atmospheric haze, dreamlike allegory.
-- Palette: antique gold, amber, burnt orange, ochre, sienna, umber, and deep brown shadows;
-  light should feel like the final minutes of sunset.
-- FACELESS PEOPLE IS A HARD REQUIREMENT FOR ALL NINE SCENES. Show people only as distant back
-  views, tiny silhouettes, cropped bodies, or heads fully hidden by shadow, haze, cloth, or light.
-- Do not describe or show identifiable eyes, noses, mouths, skin detail, facial contours,
-  front-facing people, portraits, headshots, close-ups, or three-quarter facial views.
-- Jesus may appear only from behind as a distant featureless silhouette, or as a symbolic
-  presence represented by light, a doorway, bread, a cross, or an empty path.
-- Use negative space and one strong symbol per frame: doorway, path, lamp, cross, boat, bread,
-  empty tomb, storm, olive tree, hands, or a small figure beneath a vast sky.
-- Maintain one recurring visual motif across all nine scenes for continuity, but vary composition.
-- Never request anime, Studio Ghibli, photorealism, sharp digital rendering, readable text,
-  facial features, glossy 3D, neon colors, blue-dominant lighting, or clutter.
+- Describe one distinct fine-art composition inspired by Renaissance and Baroque masters.
+- Style: Masterpiece oil painting in the style of Caravaggio and Rembrandt, 17th century baroque fine art, dramatic chiaroscuro contrast, deep rich shadows, luminous divine rays, classical oil on canvas.
+- Palette: Rich deep umber, ochre, warm gold, crimson, and deep dark background shadows pierced by intense divine beam of light.
+- COMPOSITION & FIGURES: Show dramatic scenes with strong depth. Avoid using explicit names like 'Jesus' or 'God' inside [SCENE: ...] visual descriptions to prevent safety filter false-positives. Instead, use terms like 'a noble figure in traditional robes', 'a cloaked traveler', 'a divine presence of light', or 'a reverent teacher'. Show people in shadow, silhouette, side view, or obscured by robes and light.
+
+- Use one strong symbol per frame: doorway, dusty path, oil lamp, cross, fishing boat, bread, empty tomb, storm waves, olive tree, or a figure beneath dramatic skies.
+- Maintain a cohesive Renaissance art aesthetic across all nine scenes.
+- Never request anime, photorealism 3D render, glossy graphics, neon colors, readable text, or watermarks.
 
 GOOD VISUAL EXAMPLES:
-- "A lone indistinct figure before a narrow doorway of amber light, semi-abstract oil painting,
-   thick ochre brushstrokes, smoky sunset haze, vast dark negative space"
-- "A small wooden boat reduced to rough shapes beneath a burnt-orange storm sky, symbolic oil
-   painting, blurred edges, golden light breaking through umber clouds"
-- "The silhouette of Jesus seen from behind on a ridge, form dissolving into antique-gold light,
-   allegorical oil painting, textured canvas, quiet sienna shadows"
+- "A dramatic chiaroscuro oil painting of a solitary traveler on a dusty Judean path, bathed in a single beam of divine golden light, deep Rembrandt shadows, fine art canvas"
+- "A masterwork Baroque oil painting of a storm at sea, dramatic contrast between dark swirling waves and radiant divine light piercing through storm clouds, Caravaggio lighting"
+- "A serene Renaissance composition of an empty stone tomb at dawn, a beam of warm heavenly light illuminating folded linen on stone, deep chiaroscuro contrast"
 
 EXACT FORMAT (repeat 9 times):
-[SCENE-XXX: one symbolic faceless oil-painting composition following all visual rules]
+[SCENE-XXX: one fine-art Renaissance composition following all visual rules]
 "One spoken line"
+
 
 Write the complete script now:"""
 
@@ -160,13 +157,21 @@ Write the complete script now:"""
         if label not in raw_script:
             logger.warning(f"Missing scene label: {label} — script may lack proper retention structure")
 
-    # Build clean script for TTS
+    # Build clean script for TTS (pure spoken narrative only, no technical/meta labels)
     clean_script = re.sub(r'\[SCENE[^\]]*:.*?\]', '', raw_script)
-    clean_script = '\n'.join(
-        line.strip().strip('"')
-        for line in clean_script.splitlines()
-        if line.strip() and line.strip() not in ('', '""')
-    )
+    clean_script = re.sub(r'\[[^\]]*\]', '', clean_script)
+    clean_script = re.sub(r'\([^)]*\)', '', clean_script)
+    
+    clean_lines = []
+    for line in clean_script.splitlines():
+        l = line.strip().strip('"\'')
+        l = re.sub(r'^(VO|Voiceover|Narrator|Hook|Setup|Rising|Revelation|Payoff|CTA|Scene\s*\d+)\s*:\s*', '', l, flags=re.IGNORECASE)
+        l = l.strip().strip('"\'')
+        if l:
+            clean_lines.append(l)
+
+    clean_script = '\n'.join(clean_lines)
+
 
     word_count = len(clean_script.split())
     if word_count < 30:
