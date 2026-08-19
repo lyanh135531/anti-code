@@ -35,11 +35,13 @@ def generate_shorts_script(topic_config: dict) -> dict:
     logger.info(f"Đang tạo script Shorts: {topic}")
 
     system = (
-        "You are a YouTube Shorts scriptwriter and retention specialist for the channel 'Stoicism Mind'. "
+        "You are a YouTube Shorts scriptwriter and retention specialist for 'Stoicism Mind'. "
         "You create thought-provoking, emotionally powerful short scripts about Stoic philosophy. "
-        "You always write in English and follow the exact format requested. "
-        "Your scripts are designed to MAXIMIZE viewer retention — every second must earn the viewer's attention."
+        "Your scripts reflect timeless wisdom (Marcus Aurelius, Seneca, Epictetus) on resilience, "
+        "self-discipline, emotional mastery, and inner peace. Write natural, pure spoken English intended directly for the listener. "
+        "Never include technical labels ('VO:', 'Narrator:'), stage directions, or meta commentary in spoken text."
     )
+
 
     prompt = f"""Write a powerful, thought-provoking 50-55 second YouTube Shorts script about Stoicism.
 
@@ -114,6 +116,7 @@ STRICT RULES:
 5. Label each scene with its purpose: [SCENE-HOOK], [SCENE-SETUP], [SCENE-RISING], [SCENE-REVELATION], [SCENE-PAYOFF], [SCENE-CTA]
    (First scene = HOOK, second = SETUP, middle scenes = RISING/REVELATION, second-to-last = PAYOFF, last = CTA)
 6. Tone: thought-provoking, deep, motivational
+7. PURE SPOKEN NARRATIVE ONLY: Spoken lines must contain ONLY pure, natural spoken narrative message intended for the listener. NEVER include technical terms, stage directions, scene labels ('Scene 1', 'VO:', 'Narrator:'), philosopher names in parentheses '(Marcus Aurelius)', or meta instructions.
 
 EXACT FORMAT (repeat 9 times):
 [SCENE-XXX: specific Stoic/Philosophical visual prompt, include camera direction if helpful]
@@ -135,13 +138,21 @@ Write the complete script now:"""
         if label not in raw_script:
             logger.warning(f"Missing scene label: {label} — script may lack proper retention structure")
 
-    # Build clean script for TTS
+    # Build clean script for TTS (pure spoken narrative only, no technical/meta labels)
     clean_script = re.sub(r'\[SCENE[^\]]*:.*?\]', '', raw_script)
-    clean_script = '\n'.join(
-        line.strip().strip('"')
-        for line in clean_script.splitlines()
-        if line.strip() and line.strip() not in ('', '""')
-    )
+    clean_script = re.sub(r'\[[^\]]*\]', '', clean_script)
+    clean_script = re.sub(r'\([^)]*\)', '', clean_script)
+    
+    clean_lines = []
+    for line in clean_script.splitlines():
+        l = line.strip().strip('"\'')
+        l = re.sub(r'^(VO|Voiceover|Narrator|Hook|Setup|Rising|Revelation|Payoff|CTA|Scene\s*\d+)\s*:\s*', '', l, flags=re.IGNORECASE)
+        l = l.strip().strip('"\'')
+        if l:
+            clean_lines.append(l)
+
+    clean_script = '\n'.join(clean_lines)
+
 
     word_count = len(clean_script.split())
     if word_count < 30:

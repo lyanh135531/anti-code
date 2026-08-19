@@ -38,11 +38,12 @@ def generate_new_topic() -> dict:
     history_str = "\n".join([f"- {t}" for t in past_topics]) if past_topics else "None yet."
 
     system = (
-        "You are a YouTube Shorts content strategist and viral topic specialist for a philosophy and mindset channel called 'Stoicism Mind' "
-        "dedicated EXCLUSIVELY to Stoicism, ancient wisdom, and modern mindset. "
-        "Your job is to create powerful, thought-provoking short video topics about Stoic philosophy specifically. "
-        "You understand viral content patterns and know how to create curiosity gaps that make people STOP scrolling."
+        "You are the senior content strategist for 'Stoicism Mind', dedicated to practical Stoic philosophy "
+        "and ancient wisdom (Marcus Aurelius, Seneca, Epictetus). You design thought-provoking, deeply inspiring video concepts "
+        "focusing on emotional resilience, mental mastery, Amor Fati, Memento Mori, and the Dichotomy of Control. "
+        "Never write cheap clickbait, sensational promises ('this 1 trick changes everything'), or fake quotes."
     )
+
 
     prompt = f"""Generate ONE new YouTube Shorts topic about STOICISM for the Stoicism Mind channel.
 

@@ -18,21 +18,23 @@ logger = logging.getLogger(__name__)
 def _clean_script_for_tts(script: str) -> str:
     """
     Xử lý script trước khi đưa vào TTS:
-    - Xóa các marker [SECTION:...], [PAUSE], v.v.
-    - Làm sạch ký tự đặc biệt
+    - Xóa các marker [SECTION:...], [SCENE:...], [PAUSE], v.v.
+    - Xóa các ghi chú trong ngoặc đơn (dẫn giải/kỹ thuật)
+    - Xóa các nhãn kỹ thuật như VO:, Narrator:, Scene 1:
+    - Làm sạch ký tự đặc biệt và markdown
     """
-    # Xóa các heading markers
-    text = re.sub(r'\[SECTION:[^\]]*\]', '', script)
-    # Xóa [PAUSE X.Xs] markers (sẽ được thêm vào sau nếu edge-tts hỗ trợ)
-    text = re.sub(r'\[PAUSE[^\]]*\]', ' ', text)
-    # Xóa dấu [] còn lại
-    text = re.sub(r'\[[^\]]*\]', '', text)
+    # Xóa tất cả các thẻ vuông [...] và ngoặc đơn (...)
+    text = re.sub(r'\[[^\]]*\]', '', script)
+    text = re.sub(r'\([^)]*\)', '', text)
+    # Xóa các nhãn kỹ thuật đầu dòng
+    text = re.sub(r'^(VO|Voiceover|Narrator|Hook|Setup|Rising|Revelation|Payoff|CTA|Scene\s*\d+)\s*:\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
     # Xóa markdown (**, *, #)
     text = re.sub(r'[\*\#\_]+', '', text)
     # Chuẩn hóa khoảng trắng
     text = re.sub(r'\n\s*\n', '\n\n', text)
     text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
+
 
 
 def _split_text_into_chunks(text: str, max_chars: int = 2500) -> list[str]:
