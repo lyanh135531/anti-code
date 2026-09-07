@@ -148,6 +148,7 @@ def generate_single_image(
     output_path: str | Path,
     width: int = 768,
     height: int = 1344,
+    seed: int | None = None,
 ) -> bool:
     """Generate one image and save it as a validated JPEG."""
     _validate_configuration()
@@ -167,11 +168,14 @@ def generate_single_image(
         f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}"
         f"/ai/run/{CLOUDFLARE_IMAGE_MODEL}"
     )
+    chosen_seed = seed if seed is not None else secrets.randbelow(2_147_483_647) + 1
+    if not 1 <= chosen_seed <= 2_147_483_647:
+        raise ValueError("Image seed must be between 1 and 2147483647")
     multipart_fields = {
         "prompt": (None, full_prompt),
         "width": (None, str(width)),
         "height": (None, str(height)),
-        "seed": (None, str(secrets.randbelow(2_147_483_647) + 1)),
+        "seed": (None, str(chosen_seed)),
     }
     headers = {"Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}"}
 

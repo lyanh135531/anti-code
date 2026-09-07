@@ -25,9 +25,17 @@ CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
 CLOUDFLARE_TEXT_MODEL = os.getenv(
     "CLOUDFLARE_TEXT_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 ).strip()
+CLOUDFLARE_VERIFIER_MODEL = os.getenv(
+    "CLOUDFLARE_VERIFIER_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+).strip()
 CLOUDFLARE_IMAGE_MODEL = os.getenv(
     "CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-2-klein-4b"
 ).strip()
+
+# Facebook Page Reels
+FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "").strip()
+FACEBOOK_PAGE_ACCESS_TOKEN = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "").strip()
+FACEBOOK_GRAPH_API_VERSION = os.getenv("FACEBOOK_GRAPH_API_VERSION", "v26.0").strip()
 
 # ============================================================
 # ĐƯỜNG DẪN THƯ MỤC
@@ -57,6 +65,20 @@ SHORTS_FPS        = 24
 SHORTS_MAX_IMAGES = 9        # Đúng 9 ảnh mỗi video
 FADE_DURATION     = 0.5      # Giây fade chuyển cảnh
 MUSIC_VOLUME      = 0.4     # Âm lượng nhạc nền cho Shorts
+
+# Long-form is an independent entry point; these values do not alter Shorts.
+LONG_WIDTH            = 1920
+LONG_HEIGHT           = 1080
+LONG_FPS              = 24
+LONG_MIN_DURATION     = 300
+LONG_MAX_DURATION     = 420
+LONG_MIN_IMAGES       = 24
+LONG_MAX_IMAGES       = 28
+LONG_TARGET_IMAGES    = 24
+LONG_MUSIC_VOLUME     = 0.10
+LONG_PUBLISH_TIMEZONE = "America/New_York"
+LONG_PUBLISH_HOUR     = 19
+LONG_PUBLISH_WEEKDAYS = (2, 6)  # Wednesday, Sunday (Python weekday values)
 
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
 FPS          = SHORTS_FPS
@@ -128,4 +150,3 @@ IMAGE_STYLE_PRESET = os.getenv("IMAGE_STYLE_PRESET", "renaissance").strip()
 # CHỦ ĐỀ VIDEO
 # ============================================================
 TARGET_RELIGION = "Christianity"
-

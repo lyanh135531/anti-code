@@ -115,6 +115,7 @@ def upload_video(
     privacy:       str  = "public",
     publish_at:    str  = None,       # ISO 8601: "2026-04-07T18:00:00+07:00"
     made_for_kids: bool = False,
+    contains_synthetic_media: bool = False,
 ) -> Optional[str]:
     """
     Upload video lên YouTube.
@@ -163,6 +164,7 @@ def upload_video(
             "privacyStatus":  privacy if not publish_at else "private",
             "madeForKids":    made_for_kids,
             "selfDeclaredMadeForKids": made_for_kids,
+            "containsSyntheticMedia": contains_synthetic_media,
         }
     }
 
@@ -219,6 +221,54 @@ def upload_video(
         _upload_thumbnail(service, video_id, str(thumbnail_path))
 
     return video_id
+
+
+def upload_captions(video_id: str, caption_path: str | Path, language: str = "en") -> bool:
+    """Upload an SRT caption track for an existing video."""
+    from googleapiclient.http import MediaFileUpload
+
+    path = Path(caption_path)
+    if not path.exists() or path.stat().st_size == 0:
+        raise FileNotFoundError(f"Caption file does not exist or is empty: {path}")
+    service = authenticate_youtube()
+    service.captions().insert(
+        part="snippet",
+        body={
+            "snippet": {
+                "videoId": video_id,
+                "language": language,
+                "name": "English",
+                "isDraft": False,
+            }
+        },
+        media_body=MediaFileUpload(str(path), mimetype="application/x-subrip"),
+    ).execute()
+    logger.info("Caption track uploaded for video %s", video_id)
+    return True
+
+
+def schedule_video(
+    video_id: str,
+    publish_at: str,
+    made_for_kids: bool = False,
+    contains_synthetic_media: bool = False,
+) -> bool:
+    """Schedule an already-private video after all post-upload assets succeed."""
+    service = authenticate_youtube()
+    service.videos().update(
+        part="status",
+        body={
+            "id": video_id,
+            "status": {
+                "privacyStatus": "private",
+                "publishAt": publish_at,
+                "selfDeclaredMadeForKids": made_for_kids,
+                "containsSyntheticMedia": contains_synthetic_media,
+            },
+        },
+    ).execute()
+    logger.info("Video %s scheduled for %s", video_id, publish_at)
+    return True
 
 
 def _upload_thumbnail(service, video_id: str, thumb_path: str):

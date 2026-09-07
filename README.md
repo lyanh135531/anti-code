@@ -1,11 +1,29 @@
-# YouTube Shorts AI Pipeline
+# YouTube Shorts và Facebook Reels AI Pipeline
 
-Repository này chứa hai pipeline tự động tạo một YouTube Short mỗi ngày:
+Repository này chứa các pipeline tự động tạo video ngắn:
 
-- `youtube-auto`: nội dung về Chúa Jesus và Kinh Thánh, kênh mặc định `Spiritus`.
+- `youtube-auto`: nội dung về Chúa Jesus và Kinh Thánh, đăng cùng video lên YouTube Shorts và Facebook Page Reels.
 - `youtube-stoicism`: nội dung về Stoicism, kênh mặc định `Stoicism Mind`.
 
-Mỗi pipeline tự tạo chủ đề, kịch bản 9 cảnh, SEO, giọng đọc, 9 ảnh dọc, video có phụ đề và upload/lên lịch trên YouTube.
+`youtube-auto` còn có flow long-form độc lập trong `long_main.py`: video kể chuyện
+Kinh Thánh 16:9, 5–7 phút với 24–28 ảnh, dùng nguồn Vatican/USCCB và chỉ tiếp tục khi verifier
+độc lập trả về `PASS`. Flow này có topic history, output, log và GitHub Actions riêng;
+không lấy nội dung từ Shorts.
+
+Chạy long-form:
+
+```powershell
+Set-Location C:\Project\anti-code\youtube-auto
+.\.venv\Scripts\python.exe long_main.py --dry-run
+.\.venv\Scripts\python.exe long_main.py --topic-id good-samaritan --no-upload
+.\.venv\Scripts\python.exe long_main.py --history
+```
+
+Chạy không có `--dry-run`/`--no-upload` sẽ upload ở trạng thái scheduled cho 19:00
+giờ US Eastern vào thứ Tư hoặc Chủ nhật gần nhất. Nếu source pack hoặc accuracy gate
+không đạt, pipeline dừng trước TTS, tạo ảnh, render và upload.
+
+Mỗi pipeline tự tạo chủ đề, kịch bản 9 cảnh, SEO, giọng đọc, 9 ảnh dọc và video có phụ đề. Riêng `youtube-auto` mặc định upload/lên lịch đồng thời trên YouTube và Facebook; lỗi ở một nền tảng không ngăn thử nền tảng còn lại.
 
 ## Kiến trúc AI
 
@@ -71,6 +89,11 @@ CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 CLOUDFLARE_API_TOKEN=your_cloudflare_workers_ai_token
 CLOUDFLARE_TEXT_MODEL=@cf/meta/llama-3.3-70b-instruct-fp8-fast
 CLOUDFLARE_IMAGE_MODEL=@cf/black-forest-labs/flux-2-klein-4b
+
+# Chỉ cần trong youtube-auto
+FACEBOOK_PAGE_ID=your_facebook_page_id
+FACEBOOK_PAGE_ACCESS_TOKEN=your_facebook_page_access_token
+FACEBOOK_GRAPH_API_VERSION=v26.0
 ```
 
 Chỉ `GEMINI_API_KEY` có thể bỏ trống: khi đó text sẽ dùng Cloudflare ngay từ đầu. Cloudflare Account ID và token là bắt buộc vì không có image fallback.
@@ -120,8 +143,11 @@ Các lệnh hỗ trợ:
 python main.py --help
 python main.py --history
 python main.py --channel
+python main.py --facebook-page
 python main.py --no-upload
 python main.py --schedule 19
+python main.py --platform youtube
+python main.py --platform facebook --schedule 19
 ```
 
 ## 6. Cấu hình YouTube OAuth
@@ -144,7 +170,26 @@ python main.py --channel
 
 Trình duyệt sẽ mở để cấp quyền. Token được lưu thành `youtube_token.pickle`. Nếu chạy cả hai pipeline, có thể dùng cùng `client_secrets.json`, nhưng mỗi thư mục giữ token riêng.
 
-## 7. Chạy hằng ngày
+## 7. Cấu hình Facebook Page
+
+Facebook Graph API chỉ đăng tự động vào **Page**, không đăng vào profile cá nhân. Tài khoản tạo token phải có quyền tạo nội dung trên Page.
+
+1. Tạo hoặc chọn app tại [Meta for Developers](https://developers.facebook.com/apps/).
+2. Cấp các quyền `pages_show_list`, `pages_read_engagement` và `pages_manage_posts` cho user token của app.
+3. Dùng Graph API Explorer hoặc gọi `GET /me/accounts?fields=id,name,access_token,tasks` để lấy Page ID và Page Access Token.
+4. Điền `FACEBOOK_PAGE_ID` và `FACEBOOK_PAGE_ACCESS_TOKEN` vào `youtube-auto/.env`.
+5. Kiểm tra mà không đăng video:
+
+```powershell
+Set-Location C:\Project\anti-code\youtube-auto
+python main.py --facebook-page
+```
+
+Page token thông thường có thể hết hạn hoặc bị thu hồi. Với bot chạy lâu dài và Page thuộc Business Portfolio, nên gán Page cho một System User rồi tạo token dài hạn có đúng ba quyền trên. Nếu app phục vụ tài khoản không thuộc roles của app, Meta có thể yêu cầu App Review/Advanced Access.
+
+Luồng upload dùng Reels Publishing API chính thức: tạo phiên, gửi file MP4 cục bộ, kiểm tra trạng thái rồi publish hoặc schedule. Token chỉ được gửi trong header và không được ghi vào log.
+
+## 8. Chạy hằng ngày
 
 ### Scheduler Python
 
@@ -169,7 +214,7 @@ $env:RUN_NOW = "true"
 python scheduler.py
 ```
 
-Timezone Docker mặc định là `Asia/Ho_Chi_Minh`. Khi chạy trực tiếp, scheduler dùng timezone của hệ điều hành.
+Scheduler mặc định tạo một video rồi đăng lên cả YouTube Shorts và Facebook Reels. Giờ publish được tính cố định theo GMT+7; nếu thời điểm đã chọn còn dưới 10 phút, cả hai nền tảng được chuyển sang cùng giờ ngày hôm sau.
 
 ### Windows Task Scheduler
 
@@ -181,7 +226,7 @@ Tạo Daily Task với:
 
 Thay đường dẫn bằng `youtube-stoicism` cho bot còn lại.
 
-## 8. Chạy bằng Docker
+## 9. Chạy bằng Docker
 
 Trong thư mục pipeline:
 
@@ -191,7 +236,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Container mặc định chạy `scheduler.py`. File `.env`, OAuth credentials, token và output được đọc qua volume hiện có. Thực hiện OAuth lần đầu bằng Python trên máy host trước khi chạy container vì container không thuận tiện mở trình duyệt.
+Container mặc định chạy `scheduler.py`. File `.env`, OAuth credentials, YouTube token, Facebook token và output được đọc qua volume hiện có. Thực hiện YouTube OAuth lần đầu bằng Python trên máy host trước khi chạy container vì container không thuận tiện mở trình duyệt.
 
 ## Tùy chỉnh
 
@@ -200,6 +245,7 @@ Các thiết lập nội dung và video nằm trong `config.py` của từng pip
 - `CHANNEL_NAME`, `BASE_TAGS`, `TARGET_RELIGION`.
 - `TTS_VOICE`, `TTS_RATE`, `TTS_PITCH`.
 - `YOUTUBE_PRIVACY`, `YOUTUBE_LANGUAGE`, `YOUTUBE_CATEGORY`.
+- `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, `FACEBOOK_GRAPH_API_VERSION`.
 - `SHORTS_MAX_IMAGES`, kích thước và FPS.
 
 Có thể đổi model qua `.env` mà không sửa source. Chỉ dùng model Cloudflare hỗ trợ OpenAI-compatible chat/JSON cho `CLOUDFLARE_TEXT_MODEL`, và model có multipart text-to-image tương thích cho `CLOUDFLARE_IMAGE_MODEL`.
@@ -219,6 +265,9 @@ Nhạc nền là tùy chọn. Đặt `.mp3` hoặc `.wav` vào `assets/music/` c
 | `ffmpeg not found` | Cài FFmpeg và mở terminal mới sau khi cập nhật `PATH`. |
 | `client_secrets.json` không tồn tại | Làm lại bước YouTube OAuth hoặc chạy `--no-upload`. |
 | OAuth token lỗi/đổi scope | Xóa `youtube_token.pickle`, sau đó xác thực lại. |
+| Thiếu `FACEBOOK_PAGE_ID` hoặc token | Điền hai giá trị vào `youtube-auto/.env`, rồi chạy `python main.py --facebook-page`. |
+| Facebook `code=190` | Page token hết hạn hoặc không hợp lệ; tạo token mới. |
+| Facebook `code=200` | Token thiếu `pages_manage_posts` hoặc user không có quyền tạo nội dung trên Page. |
 | Audio dài hơn 58 giây | Chạy lại để tạo script khác hoặc giảm giới hạn từ trong `script_gen.py`. |
 
 Log lỗi provider bao gồm HTTP status và phần đầu response body, nhưng không ghi API key/token.

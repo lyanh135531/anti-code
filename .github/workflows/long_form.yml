@@ -1,0 +1,78 @@
+name: Spiritus Long Form
+
+concurrency:
+  group: youtube-auto-long-pipeline
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # 18:00 UTC Wednesday/Sunday; upload is scheduled for 19:00 America/New_York.
+    - cron: "0 18 * * 0,3"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (do not upload)"
+        required: false
+        default: false
+        type: boolean
+      topic_id:
+        description: "Optional curated topic id"
+        required: false
+        type: string
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./youtube-auto
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: youtube-auto/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run long-form pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          YOUTUBE_TOKEN_BASE64: ${{ secrets.YOUTUBE_TOKEN_BASE64 }}
+          LONG_DRY_RUN: ${{ inputs.dry_run }}
+          LONG_TOPIC_ID: ${{ inputs.topic_id }}
+        shell: bash
+        run: |
+          args=()
+          if [[ "$LONG_DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          if [[ -n "$LONG_TOPIC_ID" ]]; then args+=(--topic-id "$LONG_TOPIC_ID"); fi
+          python long_main.py "${args[@]}"
+
+      - name: Commit long-form topic history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .long_topic_history.txt
+          git diff --staged --quiet || (git commit -m "chore: update long-form topic history" && git push)
+
+      - name: Upload long-form reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spiritus-long-form-reports-${{ github.run_id }}
+          path: |
+            youtube-auto/logs/long/
+            youtube-auto/output/long/**/result.json
+            youtube-auto/output/long/**/reports/
+            youtube-auto/output/long/**/scripts/
+          retention-days: 7

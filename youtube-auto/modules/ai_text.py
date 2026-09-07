@@ -96,6 +96,7 @@ def _gemini_complete(
     temperature: float,
     json_mode: bool,
     max_retries: int,
+    max_output_tokens: int,
 ) -> str:
     if not GEMINI_API_KEY:
         raise ProviderConfigurationError("GEMINI_API_KEY is not configured")
@@ -108,7 +109,7 @@ def _gemini_complete(
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": temperature,
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": max_output_tokens,
         },
     }
     if system:
@@ -151,6 +152,8 @@ def _cloudflare_complete(
     temperature: float,
     json_mode: bool,
     max_retries: int,
+    max_output_tokens: int,
+    provider_model: str | None,
 ) -> str:
     if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
         raise ProviderConfigurationError(
@@ -166,10 +169,10 @@ def _cloudflare_complete(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
     body: dict[str, Any] = {
-        "model": CLOUDFLARE_TEXT_MODEL,
+        "model": provider_model or CLOUDFLARE_TEXT_MODEL,
         "messages": messages,
         "temperature": temperature,
-        "max_tokens": 4096,
+        "max_tokens": max_output_tokens,
     }
     if json_mode:
         body["response_format"] = {"type": "json_object"}
@@ -215,24 +218,42 @@ def chat_complete(
     temperature: float = 0.8,
     json_mode: bool = False,
     max_retries: int = 3,
+    provider: str = "auto",
+    max_output_tokens: int = 4096,
+    provider_model: str | None = None,
 ) -> str:
-    """Generate text with Gemini first and Cloudflare as an explicit fallback."""
+    """Generate text with Gemini first and Cloudflare as an explicit fallback.
+
+    ``provider`` can force one provider for workflows that require an independent
+    second opinion. Defaults preserve the Shorts pipeline's existing behavior.
+    """
     if max_retries < 1:
         raise ValueError("max_retries must be at least 1")
+    if provider not in {"auto", "gemini", "cloudflare"}:
+        raise ValueError(f"Unsupported text provider: {provider}")
+    if max_output_tokens < 1:
+        raise ValueError("max_output_tokens must be at least 1")
     if model:
         logger.warning("The model argument is ignored; provider models are configured in .env")
 
     gemini_error: Exception | None = None
-    if GEMINI_API_KEY:
+    if provider in {"auto", "gemini"} and GEMINI_API_KEY:
         try:
-            return _gemini_complete(prompt, system, temperature, json_mode, max_retries)
+            return _gemini_complete(
+                prompt, system, temperature, json_mode, max_retries, max_output_tokens
+            )
         except AITextError as error:
             gemini_error = error
+            if provider == "gemini":
+                raise
             logger.warning("Gemini failed; trying Cloudflare fallback: %s", error)
 
-    if CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN:
+    if provider in {"auto", "cloudflare"} and CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN:
         try:
-            return _cloudflare_complete(prompt, system, temperature, json_mode, max_retries)
+            return _cloudflare_complete(
+                prompt, system, temperature, json_mode, max_retries, max_output_tokens,
+                provider_model,
+            )
         except AITextError as error:
             if gemini_error is not None:
                 raise AITextError(
@@ -242,9 +263,7 @@ def chat_complete(
 
     if gemini_error is not None:
         raise gemini_error
-    raise ProviderConfigurationError(
-        "Configure GEMINI_API_KEY or both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN"
-    )
+    raise ProviderConfigurationError(f"Text provider is not configured: {provider}")
 
 
 def extract_json(text: str) -> dict[str, Any]:

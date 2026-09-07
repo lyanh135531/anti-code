@@ -53,12 +53,16 @@ def run_daily_pipeline():
             upload        = True,
             dry_run       = False,
             schedule_hour = PUBLISH_HOUR if not UPLOAD_IMMEDIATELY else None,
+            platforms     = ("youtube", "facebook"),
         )
+
+        if results.get("shorts_id"):
+            logger.info(f"   YouTube Shorts ID: {results['shorts_id']}")
+        if results.get("facebook_reel_id"):
+            logger.info(f"   Facebook Reel ID: {results['facebook_reel_id']}")
 
         if results["success"]:
             logger.info("✅ Pipeline hàng ngày hoàn thành!")
-            if results.get("shorts_id"):
-                logger.info(f"   YouTube Shorts ID: {results['shorts_id']}")
         else:
             logger.error("❌ Pipeline thất bại!")
             if results.get("errors"):
@@ -71,7 +75,7 @@ def run_daily_pipeline():
 
 def main():
     logger.info("=" * 50)
-    logger.info("  📅 YOUTUBE AUTO SCHEDULER ĐANG CHẠY")
+    logger.info("  📅 SHORTS + REELS AUTO SCHEDULER ĐANG CHẠY")
     logger.info(f"  Pipeline chạy mỗi ngày lúc {PIPELINE_RUN_HOUR}")
     logger.info(f"  Video đăng lúc {PUBLISH_HOUR}:00")
     logger.info("=" * 50)

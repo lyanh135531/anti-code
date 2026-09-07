@@ -1,7 +1,7 @@
 """
 ==========================================================
-  SPIRITUS — YOUTUBE SHORTS AUTO PIPELINE
-  Tự động tạo YouTube Shorts về Chúa Jesus / Kinh Thánh
+  SPIRITUS — SHORT VIDEO AUTO PIPELINE
+  Tự động tạo và đăng YouTube Shorts + Facebook Reels
 
   Chạy:
     python main.py            # Tạo + upload Shorts
@@ -13,7 +13,7 @@
     2. Tạo script 9 cảnh + SEO metadata (AI)
     3. Tạo giọng đọc (Edge TTS)
     4. Tạo 9 ảnh bằng Cloudflare FLUX.2 Klein
-    5. Dựng video Shorts 9:16 + Upload YouTube
+    5. Dựng video dọc 9:16 + upload các nền tảng đã chọn
 ==========================================================
 """
 
@@ -65,6 +65,7 @@ from modules.cloudflare_image_gen import generate_shorts_images
 from modules.shorts_maker      import create_shorts_from_images
 from modules.seo_optimizer     import generate_seo_metadata, format_description_for_youtube
 from modules.uploader          import upload_shorts, get_channel_info
+from modules.facebook_uploader import upload_facebook_reel, get_facebook_page_info
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -84,6 +85,37 @@ def _generate_video_id() -> str:
     return f"sh_{datetime.now().strftime('%Y%m%d_%H%M')}"
 
 
+def _next_publish_at(
+    schedule_hour: int | None,
+    now: datetime | None = None,
+) -> datetime | None:
+    """Return the next GMT+7 publish time shared by all platforms."""
+    if schedule_hour is None:
+        return None
+    if not 0 <= schedule_hour <= 23:
+        raise ValueError("schedule_hour phải nằm trong khoảng 0-23")
+    tz = timezone(timedelta(hours=7))
+    current = now.astimezone(tz) if now else datetime.now(tz)
+    publish_at = current.replace(
+        hour=schedule_hour, minute=0, second=0, microsecond=0
+    )
+    # Meta requires scheduled content to be at least 10 minutes in the future.
+    if publish_at < current + timedelta(minutes=10):
+        publish_at += timedelta(days=1)
+    return publish_at
+
+
+def _normalize_platforms(platforms: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    allowed = {"youtube", "facebook"}
+    normalized = tuple(dict.fromkeys(str(item).lower() for item in platforms))
+    unknown = set(normalized) - allowed
+    if unknown:
+        raise ValueError(f"Nền tảng không được hỗ trợ: {', '.join(sorted(unknown))}")
+    if not normalized:
+        raise ValueError("Phải chọn ít nhất một nền tảng")
+    return normalized
+
+
 # ============================================================
 # PIPELINE SHORTS DUY NHẤT
 # ============================================================
@@ -92,12 +124,14 @@ def run_pipeline(
     upload:        bool = True,
     dry_run:       bool = False,
     schedule_hour: int  = None,
+    platforms: tuple[str, ...] | list[str] = ("youtube", "facebook"),
 ) -> dict:
     """Chạy toàn bộ Shorts pipeline."""
     start_time = time.time()
     results = {
         "success":    False,
         "shorts_id":  None,
+        "facebook_reel_id": None,
         "shorts_path": None,
         "metadata":   None,
         "errors":     [],
@@ -106,6 +140,14 @@ def run_pipeline(
     logger.info("=" * 60)
     logger.info("  ✝️  SPIRITUS — SHORTS PIPELINE BẮT ĐẦU")
     logger.info("=" * 60)
+
+    try:
+        selected_platforms = _normalize_platforms(platforms)
+        if schedule_hour is not None and not 0 <= schedule_hour <= 23:
+            raise ValueError("schedule_hour phải nằm trong khoảng 0-23")
+    except ValueError as e:
+        results["errors"].append(f"Config: {e}")
+        return results
 
     video_id = _generate_video_id()
 
@@ -222,42 +264,60 @@ def run_pipeline(
         results["errors"].append(f"Shorts build: {e}")
         return results
 
-    # ── Upload YouTube ────────────────────────────────────
-    publish_at = None
-    if schedule_hour is not None:
-        tz     = timezone(timedelta(hours=7))
-        now    = datetime.now(tz)
-        pub    = now.replace(hour=schedule_hour, minute=0, second=0, microsecond=0)
-        if pub <= now:
-            pub += timedelta(days=1)
-        publish_at = pub.strftime("%Y-%m-%dT%H:%M:%S+07:00")
-        logger.info(f"  📅 Lên lịch đăng: {publish_at}")
+    # ── Upload lên các nền tảng ───────────────────────────
+    # Calculate after rendering so Meta's 10-minute minimum is still valid
+    # when the upload begins, even if media generation took a long time.
+    publish_at = _next_publish_at(schedule_hour)
+    if publish_at:
+        logger.info(f"  📅 Lên lịch đăng: {publish_at.isoformat()}")
 
     if upload and not dry_run:
-        logger.info("  📤 Uploading Shorts lên YouTube...")
-        try:
-            sh_id = upload_shorts(
-                video_path  = shorts_path,
-                title       = seo_meta.get("shorts_title", seo_meta["title"][:50] + " #Shorts"),
-                description = seo_meta.get("shorts_description", ""),
-                tags        = seo_meta["tags"][:15],
-                privacy     = YOUTUBE_PRIVACY,
-                publish_at  = publish_at,
-            )
-            results["shorts_id"] = sh_id
-            if sh_id:
-                logger.info(f"  ✅ Upload OK: https://youtube.com/watch?v={sh_id}")
-            else:
-                logger.error("  ❌ Upload thất bại")
-        except Exception as e:
-            logger.error(f"  ❌ Upload lỗi: {e}")
-            results["errors"].append(f"Upload: {e}")
+        shorts_title = seo_meta.get(
+            "shorts_title", seo_meta["title"][:50] + " #Shorts"
+        )
+        shorts_description = seo_meta.get("shorts_description", "")
+
+        if "youtube" in selected_platforms:
+            logger.info("  📤 Uploading Shorts lên YouTube...")
+            try:
+                sh_id = upload_shorts(
+                    video_path=shorts_path,
+                    title=shorts_title,
+                    description=shorts_description,
+                    tags=seo_meta["tags"][:15],
+                    privacy=YOUTUBE_PRIVACY,
+                    publish_at=publish_at.isoformat() if publish_at else None,
+                )
+                results["shorts_id"] = sh_id
+                if sh_id:
+                    logger.info(f"  ✅ YouTube: https://youtube.com/watch?v={sh_id}")
+                else:
+                    results["errors"].append("YouTube: upload thất bại")
+                    logger.error("  ❌ YouTube upload thất bại")
+            except Exception as e:
+                logger.error(f"  ❌ YouTube upload lỗi: {e}")
+                results["errors"].append(f"YouTube: {e}")
+
+        if "facebook" in selected_platforms:
+            logger.info("  📤 Uploading Reel lên Facebook...")
+            try:
+                reel_id = upload_facebook_reel(
+                    video_path=shorts_path,
+                    title=shorts_title,
+                    description=shorts_description,
+                    publish_at=publish_at,
+                )
+                results["facebook_reel_id"] = reel_id
+                logger.info(f"  ✅ Facebook Reel ID: {reel_id}")
+            except Exception as e:
+                logger.error(f"  ❌ Facebook upload lỗi: {e}")
+                results["errors"].append(f"Facebook: {e}")
     else:
         logger.info("  ⏭️ Upload bị bỏ qua (dry-run hoặc --no-upload)")
 
     # ── Kết quả ──────────────────────────────────────────
     elapsed = time.time() - start_time
-    results["success"] = True
+    results["success"] = not results["errors"]
 
     logger.info("\n" + "=" * 60)
     logger.info("  📊 KẾT QUẢ")
@@ -266,6 +326,7 @@ def run_pipeline(
     logger.info(f"  📖 Kinh Thánh: {script_data.get('bible_reference', 'N/A')}")
     logger.info(f"  🎥 Shorts: {results['shorts_path']}")
     logger.info(f"  🆔 YouTube ID: {results['shorts_id'] or 'Chưa upload'}")
+    logger.info(f"  🆔 Facebook Reel ID: {results['facebook_reel_id'] or 'Chưa upload'}")
     logger.info(f"  ⏱️  Tổng thời gian: {elapsed/60:.1f} phút")
     if results["errors"]:
         logger.warning(f"  ⚠️ Lỗi nhỏ: {', '.join(results['errors'])}")
@@ -290,7 +351,7 @@ def run_pipeline(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="✝️  Spiritus — YouTube Shorts Auto Pipeline (Jesus / Christianity)",
+        description="✝️  Spiritus — YouTube Shorts + Facebook Reels Auto Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -298,17 +359,30 @@ Examples:
   python main.py --dry-run      # Tạo Shorts nhưng KHÔNG upload
   python main.py --no-upload    # Tạo Shorts nhưng KHÔNG upload
   python main.py --schedule 18  # Lên lịch đăng lúc 18:00 GMT+7
+  python main.py --platform facebook  # Chỉ đăng Facebook Reel
   python main.py --history      # Xem danh sách topics đã tạo
   python main.py --channel      # Kiểm tra thông tin kênh YouTube
+  python main.py --facebook-page # Kiểm tra Facebook Page và token
         """
     )
 
     parser.add_argument("--dry-run",   action="store_true", help="Tạo file nhưng không upload")
-    parser.add_argument("--no-upload", action="store_true", help="Không upload YouTube")
+    parser.add_argument("--no-upload", action="store_true", help="Không upload lên nền tảng nào")
     parser.add_argument("--schedule",  type=int, default=None, metavar="HOUR",
                         help="Lên lịch đăng lúc giờ này (0-23)")
+    parser.add_argument(
+        "--platform",
+        choices=("all", "youtube", "facebook"),
+        default="all",
+        help="Nền tảng upload (mặc định: all)",
+    )
     parser.add_argument("--history",   action="store_true", help="Xem lịch sử topics đã tạo")
     parser.add_argument("--channel",   action="store_true", help="Kiểm tra thông tin kênh YouTube")
+    parser.add_argument(
+        "--facebook-page",
+        action="store_true",
+        help="Kiểm tra Facebook Page và Page Access Token",
+    )
 
     args = parser.parse_args()
 
@@ -339,16 +413,38 @@ Examples:
             print(f"❌ Lỗi: {e}")
         sys.exit(0)
 
+    if args.facebook_page:
+        print("\n🔍 Đang kiểm tra Facebook Page...")
+        try:
+            page = get_facebook_page_info()
+            if page.get("id"):
+                print(f"\n✅ Page: {page.get('name') or '(không có tên)'}")
+                print(f"   ID: {page['id']}")
+            else:
+                print("❌ Không lấy được thông tin Facebook Page")
+                sys.exit(1)
+        except Exception as e:
+            print(f"❌ Lỗi: {e}")
+            sys.exit(1)
+        sys.exit(0)
+
+    platforms = (
+        ("youtube", "facebook") if args.platform == "all" else (args.platform,)
+    )
+
     results = run_pipeline(
         upload        = not (args.no_upload or args.dry_run),
         dry_run       = args.dry_run,
         schedule_hour = args.schedule,
+        platforms     = platforms,
     )
 
     if results["success"]:
         print("\n✅ Shorts đã được tạo thành công!")
         if results.get("shorts_id"):
             print(f"   🔗 https://youtube.com/watch?v={results['shorts_id']}")
+        if results.get("facebook_reel_id"):
+            print(f"   Facebook Reel ID: {results['facebook_reel_id']}")
         if results.get("shorts_path"):
             print(f"   📁 {results['shorts_path']}")
     else:
