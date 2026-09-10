@@ -19,6 +19,9 @@ from config import (
 MIN_VISUALS = LONG_MIN_IMAGES
 MAX_VISUALS = LONG_MAX_IMAGES
 TARGET_VISUALS = LONG_TARGET_IMAGES
+# Content generation may fall back to Cloudflare when Gemini is temporarily
+# unavailable. Verification below still forces Cloudflare explicitly.
+CONTENT_PROVIDER = "auto"
 REQUIRED_SECTION_KINDS = (
     "cold_open",
     "context",
@@ -89,7 +92,7 @@ SOURCES:
         system="You are a meticulous Catholic research editor. Evidence outranks eloquence.",
         temperature=0.15,
         json_mode=True,
-        provider="gemini",
+        provider=CONTENT_PROVIDER,
         max_output_tokens=4096,
     )
     brief = extract_json(raw)
@@ -149,7 +152,7 @@ OFFICIAL SOURCES:
             "You are an original Catholic narrative writer. Treat the supplied source pack as "
             "the complete universe of factual claims. Output valid JSON only."
         ),
-        provider="gemini",
+        provider=CONTENT_PROVIDER,
         max_tokens=8192,
     )
     expanded_sections = []
@@ -190,7 +193,7 @@ OFFICIAL SOURCES:
                     else ""
                 ),
                 system="You expand one Catholic narrative section from evidence only. Output JSON only.",
-                provider="gemini",
+                provider=CONTENT_PROVIDER,
                 max_tokens=2048,
             )
             count = len(re.findall(r"\b[\w’'-]+\b", str(expanded.get("narration", ""))))
@@ -219,7 +222,7 @@ SCRIPT:
     visual_plan = _json_completion(
         visual_prompt,
         system="You are a restrained Biblical art director. Output valid JSON only.",
-        provider="gemini",
+        provider=CONTENT_PROVIDER,
         max_tokens=6144,
     )
     visual_sections = visual_plan.get("sections")
@@ -455,7 +458,7 @@ OFFICIAL SOURCES: {_source_text(source_pack)}
                 prompt
                 + (f"\nThe previous repair had {count} words; rewrite within range." if attempt else ""),
                 system="You repair Catholic scripts strictly from evidence. Output JSON only.",
-                provider="gemini",
+                provider=CONTENT_PROVIDER,
                 max_tokens=2048,
             )
             count = len(re.findall(r"\b[\w’'-]+\b", str(fixed.get("narration", ""))))

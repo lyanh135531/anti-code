@@ -80,6 +80,17 @@ class SourceTests(unittest.TestCase):
 
 
 class ScriptTests(unittest.TestCase):
+    @patch("modules.long_script_gen.chat_complete")
+    def test_research_generation_allows_provider_fallback(self, complete):
+        complete.return_value = '{"narrative_facts":[]}'
+
+        long_script_gen.generate_research_brief(
+            {"title_seed": "Mercy", "bible_passage": "Luke 10:25-37"},
+            source_pack(),
+        )
+
+        self.assertEqual(complete.call_args.kwargs["provider"], "auto")
+
     def test_long_limits_match_free_quota_profile(self):
         self.assertEqual((LONG_MIN_DURATION, LONG_MAX_DURATION), (300, 420))
         self.assertEqual((LONG_MIN_IMAGES, LONG_MAX_IMAGES), (24, 28))
