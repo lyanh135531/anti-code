@@ -92,3 +92,4 @@ Most people think the Dichotomy of Control is passive. It's not.
 Most people think Memento Mori is morbid. It is a shield.
 Most people treat the Dichotomy of Control as a cage.
 Most people think Premeditatio Malorum is fear. It is armor.
+Most people treat 'Premeditatio Malorum' as fear. It is armor.
