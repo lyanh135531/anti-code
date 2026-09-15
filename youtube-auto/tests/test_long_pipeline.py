@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import long_main
 from config import LONG_MAX_DURATION, LONG_MAX_IMAGES, LONG_MIN_DURATION, LONG_MIN_IMAGES
-from modules import long_script_gen
+from modules import long_script_gen, uploader
 from modules.long_video_maker import _caption_cues
 from modules.long_sources import fetch_source, is_allowed_source
 from modules.long_topics import load_history, record_topic, select_topic
@@ -172,7 +172,9 @@ class PipelineTests(unittest.TestCase):
             long_main,
             "verify_with_one_repair",
             return_value=(normalized, {"status": "FAIL", "required_changes": ["bad claim"]}),
-        ), patch.object(long_main, "text_to_speech") as tts, patch.object(
+        ), patch.object(long_main, "authenticate_youtube"), patch.object(
+            long_main, "text_to_speech"
+        ) as tts, patch.object(
             long_main, "upload_video"
         ) as upload:
             result = long_main.run_long_pipeline(topic_id="good-samaritan")
@@ -180,6 +182,64 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(result["verification_status"], "FAIL")
             tts.assert_not_called()
             upload.assert_not_called()
+
+    def test_uploaded_video_id_survives_caption_failure(self):
+        normalized = long_script_gen.normalize_and_validate(valid_script(), source_pack())
+
+        def fake_tts(_text, audio_path, *_args):
+            Path(audio_path).write_bytes(b"audio")
+            Path(audio_path).with_suffix(".srt").write_text(
+                "1\n00:00:00,000 --> 00:00:02,000\nMercy\n", encoding="utf-8"
+            )
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            long_main, "LONG_ROOT", Path(directory) / "output"
+        ), patch.object(
+            long_main, "LONG_HISTORY", Path(directory) / ".long_history"
+        ), patch.object(
+            long_main, "authenticate_youtube"
+        ), patch.object(
+            long_main, "build_source_pack", return_value=source_pack()
+        ), patch.object(
+            long_main, "generate_research_brief", return_value={"narrative_facts": []}
+        ), patch.object(
+            long_main, "generate_long_script", return_value=normalized
+        ), patch.object(
+            long_main,
+            "verify_with_one_repair",
+            return_value=(normalized, {"status": "PASS", "required_changes": []}),
+        ), patch.object(
+            long_main, "generate_long_images", return_value=(["image.jpg"] * 24, "manifest.json")
+        ), patch.object(
+            long_main, "generate_long_thumbnail", return_value="thumbnail.jpg"
+        ), patch.object(
+            long_main, "text_to_speech", side_effect=fake_tts
+        ), patch.object(
+            long_main, "get_audio_duration", return_value=360
+        ), patch.object(
+            long_main, "build_long_video", return_value="video.mp4"
+        ), patch.object(
+            long_main, "upload_video", return_value="video-123"
+        ), patch.object(
+            long_main, "upload_captions", side_effect=RuntimeError("missing scope")
+        ):
+            result = long_main.run_long_pipeline(topic_id="good-samaritan")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["youtube_id"], "video-123")
+        self.assertIn("missing scope", result["errors"])
+
+    def test_caption_scope_is_required(self):
+        class UploadOnlyCredentials:
+            def has_scopes(self, scopes):
+                return set(scopes).issubset(
+                    {"https://www.googleapis.com/auth/youtube.upload"}
+                )
+
+        self.assertEqual(
+            uploader._missing_youtube_scopes(UploadOnlyCredentials()),
+            ["https://www.googleapis.com/auth/youtube.force-ssl"],
+        )
 
     def test_shorts_entrypoint_still_imports(self):
         import main

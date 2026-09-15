@@ -18,13 +18,22 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Scope cần thiết để upload YouTube
+# Scopes needed by the complete upload flow. captions.insert specifically
+# requires youtube.force-ssl; youtube.upload alone is not sufficient.
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
-    "https://www.googleapis.com/auth/youtube",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
 
 TOKEN_FILE = Path(__file__).parent.parent / "youtube_token.pickle"
+
+
+class YouTubeAuthScopeError(RuntimeError):
+    """Raised when a stored OAuth token cannot run the complete upload flow."""
+
+
+def _missing_youtube_scopes(creds) -> list[str]:
+    return [scope for scope in YOUTUBE_SCOPES if not creds.has_scopes([scope])]
 
 
 # ============================================================
@@ -96,7 +105,15 @@ def authenticate_youtube():
             pickle.dump(creds, f)
         logger.info(f"Token đã lưu: {TOKEN_FILE}")
 
-    service = build("youtube", "v3", credentials=creds)
+    missing_scopes = _missing_youtube_scopes(creds)
+    if missing_scopes:
+        raise YouTubeAuthScopeError(
+            "YouTube OAuth token is missing required scopes: "
+            f"{', '.join(missing_scopes)}. Delete youtube_token.pickle, authenticate again, "
+            "then replace the YOUTUBE_TOKEN_BASE64 GitHub Actions secret."
+        )
+
+    service = build("youtube", "v3", credentials=creds, cache_discovery=False)
     return service
 
 

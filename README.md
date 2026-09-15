@@ -170,6 +170,19 @@ python main.py --channel
 
 Trình duyệt sẽ mở để cấp quyền. Token được lưu thành `youtube_token.pickle`. Nếu chạy cả hai pipeline, có thể dùng cùng `client_secrets.json`, nhưng mỗi thư mục giữ token riêng.
 
+Long-form cần scope `youtube.force-ssl` để upload phụ đề. Token OAuth cũ không tự nhận
+scope mới. Sau khi thay đổi scope hoặc gặp `insufficientPermissions`, tạo lại token và cập
+nhật GitHub Actions secret:
+
+```powershell
+Set-Location C:\Project\anti-code\youtube-auto
+Remove-Item youtube_token.pickle -ErrorAction SilentlyContinue
+python main.py --channel
+[Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path youtube_token.pickle))) | Set-Clipboard
+```
+
+Dán clipboard vào repository secret `YOUTUBE_TOKEN_BASE64`, rồi chạy lại workflow.
+
 ## 7. Cấu hình Facebook Page
 
 Facebook Graph API chỉ đăng tự động vào **Page**, không đăng vào profile cá nhân. Tài khoản tạo token phải có quyền tạo nội dung trên Page.

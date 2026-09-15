@@ -40,7 +40,7 @@ from modules.long_sources import build_source_pack
 from modules.long_topics import load_history, record_topic, select_topic, topic_catalog_json
 from modules.long_video_maker import build_long_video
 from modules.tts import get_audio_duration, text_to_speech
-from modules.uploader import schedule_video, upload_captions, upload_video
+from modules.uploader import authenticate_youtube, schedule_video, upload_captions, upload_video
 
 
 BASE_DIR = Path(__file__).parent
@@ -151,6 +151,11 @@ def run_long_pipeline(
     logger.info("Spiritus long-form pipeline started: %s", run_id)
 
     try:
+        # Fail before an hour of generation if the stored token cannot upload
+        # captions or schedule the completed video.
+        if upload and not dry_run:
+            authenticate_youtube()
+
         selected_id, topic = select_topic(LONG_HISTORY, topic_id)
         result["topic_id"] = selected_id
         logger.info("Topic: %s (%s)", selected_id, topic["bible_passage"])
@@ -235,6 +240,8 @@ def run_long_pipeline(
             )
             if not youtube_id:
                 raise RuntimeError("YouTube upload failed")
+            # Preserve the remote video ID even if captions or scheduling fail.
+            result["youtube_id"] = youtube_id
             upload_captions(youtube_id, srt_path, language=YOUTUBE_LANGUAGE)
             schedule_video(
                 youtube_id,
@@ -242,7 +249,6 @@ def run_long_pipeline(
                 made_for_kids=False,
                 contains_synthetic_media=True,
             )
-            result["youtube_id"] = youtube_id
         else:
             logger.info("Upload skipped")
 
