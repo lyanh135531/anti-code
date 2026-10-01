@@ -184,7 +184,30 @@ def run_long_pipeline(
         _write_json(run_root / "reports" / "verification.json", verification)
         result["verification_status"] = verification.get("status", "FAIL")
         if result["verification_status"] != "PASS":
-            raise RuntimeError("Accuracy gate failed; media generation and upload are blocked")
+            failed_claims = [
+                claim for claim in verification.get("claims", [])
+                if isinstance(claim, dict) and claim.get("status") != "PASS"
+            ]
+            details = []
+            for claim in failed_claims[:5]:
+                details.append(
+                    f"{claim.get('section', 'unknown')}: {claim.get('claim', 'unreported claim')}"
+                    + (f" ({claim['reason']})" if claim.get("reason") else "")
+                )
+            if not details:
+                details = [str(item) for item in verification.get("required_changes", [])[:5]]
+            reason = str(verification.get("reason", "Verifier did not return a passing report"))
+            diagnostic = "; ".join(details) if details else reason
+            result["errors"].append(f"Accuracy gate failed: {diagnostic}")
+            logger.error(
+                "Accuracy gate failed: %s; model statuses=%s",
+                diagnostic,
+                verification.get("model_statuses", {}),
+            )
+            raise RuntimeError(
+                f"Accuracy gate failed ({reason}); media generation and upload are blocked. "
+                f"Details: {diagnostic}"
+            )
 
         audio_path = run_root / "audio" / f"{run_id}.mp3"
         text_to_speech(script["narration"], audio_path, TTS_VOICE, TTS_RATE, TTS_PITCH)
