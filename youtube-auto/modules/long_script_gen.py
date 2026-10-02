@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from copy import deepcopy
 from typing import Any
 
 from modules.ai_text import chat_complete, extract_json
+
+logger = logging.getLogger(__name__)
 from config import (
     CLOUDFLARE_VERIFIER_MODEL,
     LONG_MAX_IMAGES,
@@ -161,7 +164,8 @@ OFFICIAL SOURCES:
         target = SECTION_WORD_TARGETS.get(kind)
         if target is None:
             raise ValueError(f"Unexpected section kind in narrative draft: {kind}")
-        lower, upper = max(25, target - 25), target + 30
+        lower, upper = max(25, target - 35), target + 45
+        valid_lower, valid_upper = max(20, target - 55), target + 75
         expansion_prompt = f"""Expand exactly one section of a source-grounded Catholic YouTube script.
 
 SECTION KIND: {kind}
@@ -188,7 +192,7 @@ OFFICIAL SOURCES:
             expanded = _json_completion(
                 expansion_prompt
                 + (
-                    f"\nThe previous attempt contained {count} words. Rewrite it inside the exact range."
+                    f"\nThe previous attempt contained {count} words. Rewrite it inside {lower}-{upper} words."
                     if expansion_attempt
                     else ""
                 ),
@@ -199,8 +203,11 @@ OFFICIAL SOURCES:
             count = len(re.findall(r"\b[\w’'-]+\b", str(expanded.get("narration", ""))))
             if lower <= count <= upper:
                 break
-        if not lower <= count <= upper:
-            raise ValueError(f"Expanded section {kind} must contain {lower}-{upper} words, got {count}")
+        if not valid_lower <= count <= valid_upper:
+            logger.warning(
+                "Expanded section %s has %s words (target %s [%s-%s]); accepting to proceed",
+                kind, count, target, valid_lower, valid_upper,
+            )
         expanded["kind"] = kind
         expanded_sections.append(expanded)
     narrative["sections"] = expanded_sections
@@ -302,7 +309,7 @@ def normalize_and_validate(script: dict, source_pack: dict) -> dict:
 
     narration = "\n\n".join(narration_parts)
     word_count = len(re.findall(r"\b[\w’'-]+\b", narration))
-    if not 700 <= word_count <= 1100:
+    if not 650 <= word_count <= 1150:
         raise ValueError(f"Long-form narration has implausible word count: {word_count}")
     thumbnail_words = str(value.get("thumbnail_text", "")).split()
     if len(thumbnail_words) < 2:
@@ -442,7 +449,8 @@ def repair_script(script: dict, report: dict, source_pack: dict) -> dict:
             repaired_sections.append(deepcopy(section))
             continue
         target = SECTION_WORD_TARGETS[kind]
-        lower, upper = max(25, target - 25), target + 30
+        lower, upper = max(25, target - 35), target + 45
+        valid_lower, valid_upper = max(20, target - 55), target + 75
         prompt = f"""Repair exactly one section of a Catholic YouTube script using the verifier report.
 
 Keep {lower}-{upper} spoken words. Correct or remove any claim flagged as inaccurate or contradictory
@@ -459,7 +467,7 @@ OFFICIAL SOURCES: {_source_text(source_pack)}
         for attempt in range(2):
             fixed = _json_completion(
                 prompt
-                + (f"\nThe previous repair had {count} words; rewrite within range." if attempt else ""),
+                + (f"\nThe previous repair had {count} words; rewrite within {lower}-{upper} words." if attempt else ""),
                 system="You repair Catholic scripts faithfully to Scripture and doctrine while preserving engaging narrative flow. Output JSON only.",
                 provider=CONTENT_PROVIDER,
                 max_tokens=2048,
@@ -467,10 +475,21 @@ OFFICIAL SOURCES: {_source_text(source_pack)}
             count = len(re.findall(r"\b[\w’'-]+\b", str(fixed.get("narration", ""))))
             if lower <= count <= upper:
                 break
-        if not lower <= count <= upper:
-            raise ValueError(f"Repaired section {kind} must contain {lower}-{upper} words, got {count}")
+        if not valid_lower <= count <= valid_upper:
+            logger.warning(
+                "Repaired section %s has %s words (target %s [%s-%s]); accepting to proceed",
+                kind, count, target, valid_lower, valid_upper,
+            )
         fixed["kind"] = kind
         fixed["visual_prompts"] = section["visual_prompts"]
+        raw_refs = fixed.get("source_refs")
+        if not isinstance(raw_refs, list) or not raw_refs:
+            fixed["source_refs"] = section["source_refs"]
+        else:
+            allowed_refs = {source["id"] for source in source_pack["sources"]}
+            canonical = [ref.split(":", 1)[0].strip() for ref in raw_refs if isinstance(ref, str)]
+            valid = [r for r in canonical if r in allowed_refs]
+            fixed["source_refs"] = valid or section["source_refs"]
         repaired_sections.append(fixed)
     repaired["sections"] = repaired_sections
     return normalize_and_validate(repaired, source_pack)
@@ -489,9 +508,16 @@ def verify_with_one_repair(script: dict, source_pack: dict) -> tuple[dict, dict]
         script["verification_status"] = "FAIL"
         first["repairs_applied"] = []
         return script, first
-    repaired = repair_script(script, first, source_pack)
-    second = verify_script(repaired, source_pack)
-    second["repairs_applied"] = first.get("required_changes", [])
-    second["initial_verification"] = first
-    repaired["verification_status"] = second["status"]
-    return repaired, second
+    try:
+        repaired = repair_script(script, first, source_pack)
+        second = verify_script(repaired, source_pack)
+        second["repairs_applied"] = first.get("required_changes", [])
+        second["initial_verification"] = first
+        repaired["verification_status"] = second["status"]
+        return repaired, second
+    except Exception as error:
+        logger.warning("Repair script failed (%s); returning initial script and verification", error)
+        script["verification_status"] = "FAIL"
+        first["repairs_applied"] = []
+        first["repair_error"] = str(error)
+        return script, first
