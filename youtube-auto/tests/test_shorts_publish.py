@@ -14,6 +14,22 @@ def scenes():
 
 
 class ShortsPublishingTests(unittest.TestCase):
+    def test_default_uploads_only_to_youtube(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for item in self._pipeline_patches(directory):
+                item.start()
+                self.addCleanup(item.stop)
+            with patch.object(main, "upload_shorts", return_value="yt-123") as youtube, patch.object(
+                main, "upload_facebook_reel"
+            ) as facebook:
+                result = main.run_pipeline()
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["shorts_id"], "yt-123")
+        self.assertIsNone(result["facebook_reel_id"])
+        youtube.assert_called_once()
+        facebook.assert_not_called()
+
     def _pipeline_patches(self, directory):
         root = Path(directory)
         (root / "logs").mkdir(parents=True, exist_ok=True)

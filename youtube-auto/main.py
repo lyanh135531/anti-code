@@ -1,7 +1,7 @@
 """
 ==========================================================
   SPIRITUS — SHORT VIDEO AUTO PIPELINE
-  Tự động tạo và đăng YouTube Shorts + Facebook Reels
+  Tự động tạo và đăng YouTube Shorts
 
   Chạy:
     python main.py            # Tạo + upload Shorts
@@ -124,7 +124,7 @@ def run_pipeline(
     upload:        bool = True,
     dry_run:       bool = False,
     schedule_hour: int  = None,
-    platforms: tuple[str, ...] | list[str] = ("youtube", "facebook"),
+    platforms: tuple[str, ...] | list[str] = ("youtube",),
 ) -> dict:
     """Chạy toàn bộ Shorts pipeline."""
     start_time = time.time()
@@ -351,7 +351,7 @@ def run_pipeline(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="✝️  Spiritus — YouTube Shorts + Facebook Reels Auto Pipeline",
+        description="✝️  Spiritus — YouTube Shorts Auto Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -373,8 +373,8 @@ Examples:
     parser.add_argument(
         "--platform",
         choices=("all", "youtube", "facebook"),
-        default="all",
-        help="Nền tảng upload (mặc định: all)",
+        default="youtube",
+        help="Nền tảng upload (mặc định: youtube; Facebook chỉ khi chọn rõ)",
     )
     parser.add_argument("--history",   action="store_true", help="Xem lịch sử topics đã tạo")
     parser.add_argument("--channel",   action="store_true", help="Kiểm tra thông tin kênh YouTube")

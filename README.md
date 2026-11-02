@@ -2,7 +2,7 @@
 
 Repository này chứa các pipeline tự động tạo video ngắn:
 
-- `youtube-auto`: nội dung về Chúa Jesus và Kinh Thánh, đăng cùng video lên YouTube Shorts và Facebook Page Reels.
+- `youtube-auto`: nội dung về Chúa Jesus và Kinh Thánh, tự động đăng lên YouTube Shorts. Facebook Page Reels chỉ đăng khi chọn rõ bằng CLI.
 - `youtube-stoicism`: nội dung về Stoicism, kênh mặc định `Stoicism Mind`.
 
 `youtube-auto` còn có flow long-form độc lập trong `long_main.py`: video kể chuyện
@@ -23,7 +23,7 @@ Chạy không có `--dry-run`/`--no-upload` sẽ upload ở trạng thái schedu
 giờ US Eastern vào thứ Tư hoặc Chủ nhật gần nhất. Nếu source pack hoặc accuracy gate
 không đạt, pipeline dừng trước TTS, tạo ảnh, render và upload.
 
-Mỗi pipeline tự tạo chủ đề, kịch bản 9 cảnh, SEO, giọng đọc, 9 ảnh dọc và video có phụ đề. Riêng `youtube-auto` mặc định upload/lên lịch đồng thời trên YouTube và Facebook; lỗi ở một nền tảng không ngăn thử nền tảng còn lại.
+Mỗi pipeline tự tạo chủ đề, kịch bản 9 cảnh, SEO, giọng đọc, 9 ảnh dọc và video có phụ đề. `youtube-auto` mặc định chỉ upload/lên lịch trên YouTube; job GitHub Actions và scheduler không đăng Facebook. Muốn đăng Facebook thủ công, dùng `--platform facebook` hoặc `--platform all`.
 
 ## Kiến trúc AI
 
@@ -90,7 +90,7 @@ CLOUDFLARE_API_TOKEN=your_cloudflare_workers_ai_token
 CLOUDFLARE_TEXT_MODEL=@cf/meta/llama-3.3-70b-instruct-fp8-fast
 CLOUDFLARE_IMAGE_MODEL=@cf/black-forest-labs/flux-2-klein-4b
 
-# Chỉ cần trong youtube-auto
+# Chỉ cần khi chủ động đăng Facebook bằng CLI trong youtube-auto
 FACEBOOK_PAGE_ID=your_facebook_page_id
 FACEBOOK_PAGE_ACCESS_TOKEN=your_facebook_page_access_token
 FACEBOOK_GRAPH_API_VERSION=v26.0
@@ -227,7 +227,7 @@ $env:RUN_NOW = "true"
 python scheduler.py
 ```
 
-Scheduler mặc định tạo một video rồi đăng lên cả YouTube Shorts và Facebook Reels. Giờ publish được tính cố định theo GMT+7; nếu thời điểm đã chọn còn dưới 10 phút, cả hai nền tảng được chuyển sang cùng giờ ngày hôm sau.
+Scheduler tạo một video rồi chỉ đăng lên YouTube Shorts. Giờ publish được tính cố định theo GMT+7; nếu thời điểm đã chọn còn dưới 10 phút, video được chuyển sang cùng giờ ngày hôm sau.
 
 ### Windows Task Scheduler
 
