@@ -1,0 +1,84 @@
+name: Spiritus Sleep Meditation Long Form
+
+concurrency:
+  group: youtube-auto-sleep-pipeline
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # 20:00 UTC Friday; upload is scheduled for 21:00 America/New_York (Prime time for US sleep listening)
+    - cron: "0 20 * * 5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (do not upload)"
+        required: false
+        default: false
+        type: boolean
+      topic_id:
+        description: "Optional curated sleep topic id (psalm-91, psalm-23, psalm-121, peace-be-still, releasing-anxiety)"
+        required: false
+        type: string
+      duration:
+        description: "Duration in seconds (default 5400 = 1.5h; set 300 for quick test)"
+        required: false
+        type: string
+        default: "5400"
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./youtube-auto
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: youtube-auto/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run sleep long-form pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          YOUTUBE_TOKEN_BASE64: ${{ secrets.YOUTUBE_TOKEN_BASE64 }}
+          SLEEP_DRY_RUN: ${{ inputs.dry_run }}
+          SLEEP_TOPIC_ID: ${{ inputs.topic_id }}
+          SLEEP_DURATION: ${{ inputs.duration }}
+        shell: bash
+        run: |
+          args=()
+          if [[ "$SLEEP_DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          if [[ -n "$SLEEP_TOPIC_ID" ]]; then args+=(--topic-id "$SLEEP_TOPIC_ID"); fi
+          if [[ -n "$SLEEP_DURATION" ]]; then args+=(--duration "$SLEEP_DURATION"); fi
+          python sleep_main.py "${args[@]}"
+
+      - name: Commit sleep topic history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .sleep_topic_history.txt
+          git diff --staged --quiet || (git commit -m "chore: update sleep topic history" && git push)
+
+      - name: Upload sleep reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spiritus-sleep-reports-${{ github.run_id }}
+          path: |
+            youtube-auto/logs/sleep/
+            youtube-auto/output/sleep/**/result.json
+            youtube-auto/output/sleep/**/scripts/
+          retention-days: 7

@@ -19,6 +19,17 @@ Set-Location C:\Project\anti-code\youtube-auto
 .\.venv\Scripts\python.exe long_main.py --history
 ```
 
+`youtube-auto` có thêm flow **Sleep & Ambient Bible Meditation (1–2 giờ)** trong `sleep_main.py`: video chiêm niệm Thánh Vịnh, lời cầu nguyện bình an ban đêm kết hợp tiếng mưa và nhạc ambient 432Hz giúp kéo 4.000 giờ xem bật kiếm tiền (YPP). Flow này tối ưu chạy siêu tốc trên GitHub Actions qua FFmpeg stream-loop muxing:
+
+```powershell
+Set-Location C:\Project\anti-code\youtube-auto
+.\.venv\Scripts\python.exe sleep_main.py --dry-run --duration 300
+.\.venv\Scripts\python.exe sleep_main.py --topic-id psalm-91 --no-upload
+.\.venv\Scripts\python.exe sleep_main.py --history
+```
+
+Workflow GitHub Actions tự động cho video ngủ: `.github/workflows/sleep_long_form.yml` (chạy định kỳ tối thứ Sáu hàng tuần cho khán giả Mỹ nghe trước khi ngủ).
+
 Chạy không có `--dry-run`/`--no-upload` sẽ upload ở trạng thái scheduled cho 19:00
 giờ US Eastern vào thứ Tư hoặc Chủ nhật gần nhất. Nếu source pack hoặc accuracy gate
 không đạt, pipeline dừng trước TTS, tạo ảnh, render và upload.

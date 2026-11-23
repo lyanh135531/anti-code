@@ -80,6 +80,27 @@ LONG_PUBLISH_TIMEZONE = "America/New_York"
 LONG_PUBLISH_HOUR     = 19
 LONG_PUBLISH_WEEKDAYS = (2, 6)  # Wednesday, Sunday (Python weekday values)
 
+# ============================================================
+# CÀI ĐẶT SLEEP & AMBIENT BIBLE (1-2 GIỜ)
+# ============================================================
+SLEEP_WIDTH            = 1920
+SLEEP_HEIGHT           = 1080
+SLEEP_FPS              = 24
+SLEEP_MIN_DURATION     = 3600   # 1 giờ (giây)
+SLEEP_MAX_DURATION     = 7200   # 2 giờ (giây)
+SLEEP_TARGET_DURATION  = int(os.getenv("SLEEP_TARGET_DURATION", "5400"))  # 1.5 giờ (90 phút)
+SLEEP_MIN_IMAGES       = 4
+SLEEP_MAX_IMAGES       = 6
+SLEEP_IMAGE_DURATION   = 40.0   # Mỗi ảnh hiển thị 40 giây trong clip lặp nền
+SLEEP_CROSSFADE        = 3.0    # 3 giây crossfade mượt mà
+SLEEP_MUSIC_VOLUME     = 0.22   # Âm lượng nhạc thiền / tiếng mưa nhẹ nhàng
+SLEEP_VOICE            = os.getenv("SLEEP_VOICE", "en-US-ChristopherNeural")  # Giọng nam Mỹ trầm ấm
+SLEEP_TTS_RATE         = "-15%"
+SLEEP_TTS_PITCH        = "-2Hz"
+SLEEP_PUBLISH_TIMEZONE = "America/New_York"
+SLEEP_PUBLISH_HOUR     = 21     # 21:00 (9:00 PM) NY time - trước giờ đi ngủ
+SLEEP_PUBLISH_WEEKDAYS = (4, 6) # Friday (4), Sunday (6)
+
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
 FPS          = SHORTS_FPS
 MAX_IMAGES   = SHORTS_MAX_IMAGES
