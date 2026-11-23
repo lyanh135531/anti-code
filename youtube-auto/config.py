@@ -99,7 +99,7 @@ SLEEP_TTS_RATE         = "-15%"
 SLEEP_TTS_PITCH        = "-2Hz"
 SLEEP_PUBLISH_TIMEZONE = "America/New_York"
 SLEEP_PUBLISH_HOUR     = 21     # 21:00 (9:00 PM) NY time - trước giờ đi ngủ
-SLEEP_PUBLISH_WEEKDAYS = (4, 6) # Friday (4), Sunday (6)
+SLEEP_PUBLISH_WEEKDAYS = (0, 1, 2, 3, 4, 5, 6) # Đăng mỗi ngày (Thứ Hai đến Chủ Nhật)
 
 # Giữ lại các alias để không bị lỗi import cũ trong các module khác
 FPS          = SHORTS_FPS

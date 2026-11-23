@@ -6,8 +6,8 @@ concurrency:
 
 on:
   schedule:
-    # 20:00 UTC Friday; upload is scheduled for 21:00 America/New_York (Prime time for US sleep listening)
-    - cron: "0 20 * * 5"
+    # Chạy mỗi ngày lúc 20:00 UTC; lên lịch đăng lúc 21:00 America/New_York (giờ vàng khán giả Mỹ bật nghe khi ngủ)
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

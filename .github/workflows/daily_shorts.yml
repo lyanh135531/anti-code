@@ -6,9 +6,9 @@ concurrency:
   cancel-in-progress: false
 
 on:
-  schedule:
-    # Chạy lúc 06:45 UTC mỗi ngày (tương đương 13:45 chiều GMT+7)
-    - cron: "45 6 * * *"
+  # schedule:
+  #   # Tạm dừng đăng Shorts tự động để tập trung kéo 4.000 giờ xem bằng video dài
+  #   - cron: "45 6 * * *"
   workflow_dispatch:
     # Cho phép chạy thủ công từ tab Actions
     inputs:
